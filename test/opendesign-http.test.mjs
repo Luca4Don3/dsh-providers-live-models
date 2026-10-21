@@ -208,6 +208,30 @@ test('a disabled id from the store is reported as disabled by the catalog', asyn
   assert.deepEqual(result.body.routes[0].models.map(model => [model.id, model.enabled]), [['go-a', true], ['go-b', false]])
 })
 
+test('the rejection note counts only entries that were actually dropped', async () => {
+  // Regression: diagnostics has one row per accepted model as well, so counting
+  // its length claimed every model had been rejected.
+  const provider = { status: () => ({ available: true, configured: true, diagnostics: [
+      { id: 'od-one', outputBudgetSource: 'local-default' },
+      { id: 'od-two', reason: 'missing-or-invalid-context' },
+    ] }),
+    models: () => [{ id: 'od-one', name: 'OD One', contextWindow: 1000, maxTokens: 8192, input: ['text'], reasoningLevels: [] }] }
+  const result = await call(authFixture(), 'GET', '/routes', undefined, undefined, provider, {
+    preferences: { snapshot: () => ({ disabledModels: [], reasoning: {}, providers: {} }) },
+  })
+  const note = result.body.routes.find(route => route.id === 'opendesign')?.note
+  assert.match(String(note), /^1 条/, 'only the entry with a reason is counted')
+})
+
+test('a roster without rejections carries no note at all', async () => {
+  const provider = { status: () => ({ available: true, configured: true, diagnostics: [
+      { id: 'od-one', outputBudgetSource: 'local-default' }] }),
+    models: () => [{ id: 'od-one', name: 'OD One', contextWindow: 1000, maxTokens: 8192, input: ['text'], reasoningLevels: [] }] }
+  const result = await call(authFixture(), 'GET', '/routes', undefined, undefined, provider, {
+    preferences: { snapshot: () => ({ disabledModels: [], reasoning: {}, providers: {} }) },
+  })
+  assert.equal(result.body.routes.find(route => route.id === 'opendesign')?.note, undefined)
+})
 test('unknown routes and missing services remain explicit and foreign prefixes fall through', async () => {
   assert.equal((await call(undefined, 'GET', '/status')).status, 503)
   assert.equal((await call(authFixture(), 'POST', '/not-found')).status, 404)
