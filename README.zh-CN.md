@@ -1,4 +1,4 @@
-# dsh-opencode-live-models
+# dsh-providers-live-models
 
 [English](README.md) | 中文
 
@@ -9,13 +9,13 @@ DeepSeek Harness（DSH）自带的 pi-ai 模型目录可能跟不上 OpenCode Go
 **桌面端** —— 侧栏打开「插件」页面，点「添加插件」，粘贴下面的 spec，再点「立即启用」并重启 DSH：
 
 ```
-github:Luca4Don3/dsh-opencode-live-models
+github:Luca4Don3/dsh-providers-live-models
 ```
 
 **CLI** —— `add` 会同时安装并选中该组合包，重启 DSH 后生效：
 
 ```sh
-dsh plugin --profile desktop add github:Luca4Don3/dsh-opencode-live-models
+dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
 `github:` spec 通过 HTTPS 从 codeload.github.com 拉取，npm 镜像不代理它，因此需要宿主机能访问 GitHub。
@@ -69,7 +69,7 @@ config:
 当前桥接明确校验 DSH 0.2.1-rc.2 与其同源 pi-ai 1.1.0，不新增或升级 pi-ai 依赖。宿主不匹配时仅 OpenDesign 报不可用，旧提供方不受影响。新登录接口目前限本机同源 GUI。实现与未完成的验证见 [OpenDesign 接入说明](docs/opendesign.md)。
 ## 登录和订阅额度
 
-打开侧栏「插件」→「dsh-opencode-live-models」，详情页提供「使用 ChatGPT 账号登录」、重新登录、授权状态、回调地址粘贴与取消操作。
+打开侧栏「插件」→「dsh-providers-live-models」，详情页提供「使用 ChatGPT 账号登录」、重新登录、授权状态、回调地址粘贴与取消操作。
 
 打开「设置 → 账号与余额」，官方 DeepSeek 余额下方会自动显示已登录／已配置凭据的订阅，最多同时显示 4 个供应商，不重复显示 DeepSeek 官方余额。优先显示 OpenAI订阅和 OpenCode Go 的百分比额度卡片，OpenCode Zen 等金额余额以整行长框放在最下方。进入页面时查询，也可点击刷新。订阅卡片显示剩余额度百分比与重置时间，不换算为现金金额；缺失数据保持未知，过期数据保留原查询时间。额度查询与模型目录的后台刷新相互独立。
 
@@ -91,7 +91,7 @@ config:
 
 在侧栏「插件」页打开本插件详情，点击 **登录 OpenCode Console**。浏览器打开官方设备授权页，选择与你的 Zen Key 相同的工作区并批准授权。回到 DSH，显示已登录后，在「设置 → 账号与余额」刷新 Zen 余额。查询优先使用该工作区的 Console 登录凭据，没有登录记录时才尝试现有 API Key。已存在但失效的登录不会静默切换到另一个 Key／工作区。
 
-OpenCode 使用官方文档中的设备授权流程，登录和刷新仅访问 `https://opencode.ai/console/auth/device/*`。令牌通过宿主凭据服务保存于独立的 `dsh-opencode-live-models/opencode-console` grant，不改写模型 API Key 或 Codex OAuth。余额和显示缓存按工作区摘要隔离。刷新令牌只用一次；请求前持久化刷新标记，网络结果不确定或进程中断后要求重新登录，避免重放旧刷新令牌导致整份登录失效。插件停用会取消在途设备授权与余额请求。
+OpenCode 使用官方文档中的设备授权流程，登录和刷新仅访问 `https://opencode.ai/console/auth/device/*`。令牌通过宿主凭据服务保存于独立的 `dsh-providers-live-models/opencode-console` grant，不改写模型 API Key 或 Codex OAuth。余额和显示缓存按工作区摘要隔离。刷新令牌只用一次；请求前持久化刷新标记，网络结果不确定或进程中断后要求重新登录，避免重放旧刷新令牌导致整份登录失效。插件停用会取消在途设备授权与余额请求。
 
 Zen 查询 Console 网页使用的 `GET https://opencode.ai/console/api/billing/status`，将有效响应中的 `availableMicroCents` 按 100,000,000 = 1 USD 转换。预付费显示「余额」，后付费显示「可用额度」。API Key 回退接受新版 `oc_sk_…` 和旧版 `sk-…` 格式，但不能保证网页计费接口允许 API Key 访问：已实测同一 All 权限 Key 的公开配置接口返回 200、计费接口返回 403，补充对应工作区请求头仍然被拒绝。因此 403 只显示「计费接口拒绝访问」，不会断言用户未开启权限，也不能保证增加 `billing:read` 或 All 权限可解决。Console 登录账号本身也需要所选工作区的计费访问权限。
 

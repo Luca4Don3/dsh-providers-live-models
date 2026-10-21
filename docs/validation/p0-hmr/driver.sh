@@ -1,7 +1,7 @@
 #!/bin/sh
 # P0-10 same-process test: disable and re-enable the plugin while one DSH process runs.
 set -eu
-RUN_DIR='<server_path>/Workspace/dsh-opencode-live-models/.temp/p0-hmr-verify'
+RUN_DIR='<server_path>/Workspace/dsh-providers-live-models/.temp/p0-hmr-verify'
 cd "$RUN_DIR"
 rm -f run.log
 sh launch.sh > run.log 2>&1 &

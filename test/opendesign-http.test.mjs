@@ -4,7 +4,7 @@ import { handleOpenDesignHttp, validateOpenDesignRequest } from '../lib/opendesi
 import { handleLoginHttp } from '../lib/subscription/login-http.js'
 import { createOpenDesignAuth, OPENDESIGN_RECORD } from '../lib/opendesign/auth.js'
 
-const PREFIX = '/dsh-opencode-live-models/opendesign'
+const PREFIX = '/dsh-providers-live-models/opendesign'
 function req(method, path, body, headers = {}) {
   const raw = typeof body === 'string' ? body : JSON.stringify(body ?? {})
   return { method, url: PREFIX + path, headers: { host: '127.0.0.1:54626', origin: 'http://127.0.0.1:54626', 'content-type': 'application/json', ...headers },
@@ -83,7 +83,7 @@ test('manual API key uses only the OpenDesign controller and is never echoed', a
 test('key save with real auth controller preserves Codex and OpenCode grant records', async () => {
   const records = new Map([
     ['llm-pi-ai/openai-codex', { kind: 'grant', payload: { type: 'oauth', access: 'codex-private' } }],
-    ['dsh-opencode-live-models/opencode-console', { kind: 'grant', payload: { access: 'console-private' } }],
+    ['dsh-providers-live-models/opencode-console', { kind: 'grant', payload: { access: 'console-private' } }],
   ])
   const before = structuredClone([...records])
   const credentials = {
@@ -211,6 +211,6 @@ test('a disabled id from the store is reported as disabled by the catalog', asyn
 test('unknown routes and missing services remain explicit and foreign prefixes fall through', async () => {
   assert.equal((await call(undefined, 'GET', '/status')).status, 503)
   assert.equal((await call(authFixture(), 'POST', '/not-found')).status, 404)
-  const request = req('GET', '/status'); request.url = '/dsh-opencode-live-models/status'
+  const request = req('GET', '/status'); request.url = '/dsh-providers-live-models/status'
   assert.equal(await handleOpenDesignHttp({}, request, res()), false)
 })

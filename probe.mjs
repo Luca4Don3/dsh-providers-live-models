@@ -61,7 +61,7 @@ const ok = (name, pass, detail = '') => results.push({ name, pass, detail })
  * The hot-reload scenario deliberately does *not* call this: sharing the slot is
  * the behaviour under test there.
  */
-const STATE_KEY = Symbol.for('dsh-opencode-live-models.state')
+const STATE_KEY = Symbol.for('dsh-providers-live-models.state')
 
 /**
  * One scope's entry out of a cache payload, whichever schema wrote it.
@@ -2915,7 +2915,7 @@ await freshStateAsync()
 // loads a module against it. Every earlier section drives its refreshes through
 // globals this would repoint.
 {
-  const STATE_KEY = Symbol.for('dsh-opencode-live-models.state')
+  const STATE_KEY = Symbol.for('dsh-providers-live-models.state')
   const legacy = {
     remoteCatalog: new Map(), liveModelIds: new Set(['kept-model']), pendingShrink: null,
     pendingCatalogShrink: null, deferredRoster: null, deferredCatalog: null,

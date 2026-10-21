@@ -15,7 +15,7 @@ OpenDesign startup leaves the other three untouched (covered by a synthetic
 ## Authentication
 
 Two isolated modes, both stored in the plugin-owned credential record
-`dsh-opencode-live-models/opendesign`:
+`dsh-providers-live-models/opendesign`:
 
 | Mode | What is stored | Models | Quota |
 | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ stable public API and must be re-reviewed on a DSH upgrade.
 The plugin page lists the roster with one checkbox per model. Only checked models
 are offered to the harness; the rest stay in the list (dimmed) so they can be
 turned back on. "全部开启 / 全部关闭" flips the whole set. Selections are stored in
-`<profile>/.dsh-opencode-live-models/opendesign.json` — ids only, never a
+`<profile>/.dsh-providers-live-models/opendesign.json` — ids only, never a
 credential — and the route is republished immediately, so the change applies
 without a restart.
 

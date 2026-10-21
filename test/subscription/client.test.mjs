@@ -34,7 +34,7 @@ function createSlots(accountEntries = [{ options: { id: 'account' }, component: 
   }
 }
 
-const STORAGE_KEY = 'dsh-opencode-live-models.subscription-balances.v1'
+const STORAGE_KEY = 'dsh-providers-live-models.subscription-balances.v1'
 function memoryStorage() {
   const data = new Map()
   return { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) }
@@ -399,13 +399,13 @@ test('plugin page reads status and its sign-in button starts the native login AP
   ui.render()
   ui.effects[0]()
   await tick()
-  assert.equal(calls[0].url, '/dsh-opencode-live-models/status')
+  assert.equal(calls[0].url, '/dsh-providers-live-models/status')
   assert.equal(calls[0].init.headers['content-type'], undefined)
   const button = elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用 ChatGPT 账号登录 / Sign in with ChatGPT'))
   assert.ok(button)
   button.props.onClick()
   await tick()
-  assert.equal(calls[1].url, '/dsh-opencode-live-models/login')
+  assert.equal(calls[1].url, '/dsh-providers-live-models/login')
   assert.equal(calls[1].init.method, 'POST')
   assert.equal(calls[1].init.credentials, 'same-origin')
   assert.ok(elements(ui.render()).some(node => node.type === 'button' && node.children.includes('取消登录 / Cancel')))
@@ -420,15 +420,15 @@ test('plugin detail includes OpenCode official login, its device code, authoriza
       : url.endsWith('/cancel') ? { status: 'cancelled' } : null })
   } })
   ui.render(); ui.effects[2](); await tick()
-  assert.equal(calls[0].url, '/dsh-opencode-live-models/opencode/status')
+  assert.equal(calls[0].url, '/dsh-providers-live-models/opencode/status')
   const card = () => elements(ui.render()).find(node => node.props?.['data-opencode-login'])
   elements(card()).find(node => node.type === 'button').props.onClick(); await tick()
-  assert.equal(calls[1].url, '/dsh-opencode-live-models/opencode/login')
+  assert.equal(calls[1].url, '/dsh-providers-live-models/opencode/login')
   assert.equal(calls[1].options.method, 'POST')
   assert.ok(elements(card()).some(node => node.children.includes('TEST-CODE')))
   assert.ok(elements(card()).some(node => node.type === 'a' && node.props.href.startsWith('https://opencode.ai/console/device')))
   elements(card()).find(node => node.type === 'button').props.onClick(); await tick()
-  assert.equal(calls[2].url, '/dsh-opencode-live-models/opencode/cancel')
+  assert.equal(calls[2].url, '/dsh-providers-live-models/opencode/cancel')
   ui.dispose()
 })
 
@@ -460,7 +460,7 @@ test('waiting login supports callback paste and cancellation in the plugin page'
   assert.equal(submit.props.disabled, false)
   submit.props.onClick()
   await tick()
-  assert.equal(calls[0].url, '/dsh-opencode-live-models/code')
+  assert.equal(calls[0].url, '/dsh-providers-live-models/code')
   assert.deepEqual(JSON.parse(calls[0].init.body), { value: 'http://localhost:1455/auth/callback?code=fixture' })
   const cancelUi = loadClient({
     status: { loggedIn: false, login: { status: 'waiting' } },
@@ -468,7 +468,7 @@ test('waiting login supports callback paste and cancellation in the plugin page'
   })
   elements(cancelUi.render()).find(node => node.type === 'button' && node.children.includes('取消登录 / Cancel')).props.onClick()
   await tick()
-  assert.equal(calls.at(-1).url, '/dsh-opencode-live-models/cancel')
+  assert.equal(calls.at(-1).url, '/dsh-providers-live-models/cancel')
   assert.equal(calls.at(-1).init.method, 'POST')
 })
 
@@ -512,7 +512,7 @@ test('account page queries only configured subscriptions and refreshes their rem
   assert.equal(ui.renderBalances(), null)
   const cleanup = ui.effects[0]()
   await tick()
-  assert.deepEqual(calls, ['/dsh-opencode-live-models/subscriptions', '/dsh-opencode-live-models/usage?provider=openai-codex'])
+  assert.deepEqual(calls, ['/dsh-providers-live-models/subscriptions', '/dsh-providers-live-models/usage?provider=openai-codex'])
   const nodes = elements(ui.renderBalances())
   assert.ok(nodes.some(node => node.children.includes('剩余 75%')))
   assert.ok(nodes.some(node => node.children.includes('OpenAI订阅')))
@@ -524,7 +524,7 @@ test('account page queries only configured subscriptions and refreshes their rem
   assert.ok(nodes.some(node => node.children.some(child => typeof child === 'string' && child.startsWith('更新于 '))))
   nodes.find(node => node.type === 'button').props.onClick()
   await tick()
-  assert.deepEqual(calls.slice(2), ['/dsh-opencode-live-models/subscriptions', '/dsh-opencode-live-models/usage?provider=openai-codex&refresh=1'])
+  assert.deepEqual(calls.slice(2), ['/dsh-providers-live-models/subscriptions', '/dsh-providers-live-models/usage?provider=openai-codex&refresh=1'])
   cleanup()
 })
 
@@ -553,7 +553,7 @@ test('an account without subscriptions renders no quota cards or usage requests'
   ui.effects[0]()
   await tick()
   assert.equal(ui.renderBalances(), null)
-  assert.deepEqual(calls, ['/dsh-opencode-live-models/subscriptions'])
+  assert.deepEqual(calls, ['/dsh-providers-live-models/subscriptions'])
 })
 
 test('a subscription failure does not hide another subscription or turn unknown quota into zero', async () => {
@@ -676,9 +676,9 @@ test('reopening shows fresh balances before the local credential check completes
   await tick()
   assert.ok(!elements(ui.renderBalances()).some(node => node.children.includes('正在更新，暂显示上次查询结果')))
   assert.deepEqual(calls, [
-    '/dsh-opencode-live-models/subscriptions',
-    '/dsh-opencode-live-models/usage?provider=opencode-go',
-    '/dsh-opencode-live-models/subscriptions',
+    '/dsh-providers-live-models/subscriptions',
+    '/dsh-providers-live-models/usage?provider=opencode-go',
+    '/dsh-providers-live-models/subscriptions',
   ])
 })
 
@@ -905,7 +905,7 @@ test('signed out, both sign-in paths are offered and only one is expanded', asyn
   await tick()
   assert.ok(calls.some(([url]) => url.endsWith('/opendesign/status')))
   assert.ok(calls.some(([url]) => url.endsWith('/opencode/status')))
-  assert.ok(calls.some(([url]) => url === '/dsh-opencode-live-models/status'))
+  assert.ok(calls.some(([url]) => url === '/dsh-providers-live-models/status'))
   for (const cleanup of cleanups) cleanup()
   ui.dispose()
 })
@@ -953,14 +953,14 @@ test('OpenDesign account login renders only the official activation link and can
   elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用 OpenDesign 账号授权')).props.onClick()
   await tick()
   const nodes = elements(ui.render())
-  assert.equal(calls[0][0], '/dsh-opencode-live-models/opendesign/login')
+  assert.equal(calls[0][0], '/dsh-providers-live-models/opendesign/login')
   assert.ok(nodes.some(node => node.type === 'strong' && node.children.includes('OD-CODE')))
   const link = nodes.find(node => node.type === 'a' && node.props.href?.startsWith('https://open-design.ai/cloud/cli/activate'))
   assert.ok(link)
   assert.equal(link.props.rel, 'noopener noreferrer')
   nodes.find(node => node.type === 'button' && node.children.includes('取消 OpenDesign 登录')).props.onClick()
   await tick()
-  assert.equal(calls.at(-1)[0], '/dsh-opencode-live-models/opendesign/cancel')
+  assert.equal(calls.at(-1)[0], '/dsh-providers-live-models/opendesign/cancel')
   ui.dispose()
 })
 
@@ -1214,7 +1214,7 @@ test('the plugin page asks for the catalog on the OpenDesign-prefixed route', as
     return response({ loggedIn: false })
   } })
   for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
-  assert.ok(requested.includes('/dsh-opencode-live-models/opendesign/routes'), 'the mounted path is used')
+  assert.ok(requested.includes('/dsh-providers-live-models/opendesign/routes'), 'the mounted path is used')
   const nodes = elements(ui.render())
   assert.ok(nodes.some(node => node.props?.['data-provider-group'] === 'opencode'))
   ui.dispose()

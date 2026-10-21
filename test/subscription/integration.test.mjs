@@ -199,7 +199,7 @@ test('unified entry mounts quota HTTP services under its own plugin lifetime', a
   })
   await Promise.all(pending)
   assert.deepEqual(services.get('subscriptionUsage').providers, ['openai-codex', 'opencode-go', 'opencode', 'opendesign'])
-  assert.equal(routes[0].path, '/dsh-opencode-live-models')
+  assert.equal(routes[0].path, '/dsh-providers-live-models')
   const body = await new Promise(resolve => routes[0].handler({ method: 'GET', url: routes[0].path + '/status', headers: {} }, { writeHead() {}, end: data => resolve(JSON.parse(data)) }))
   assert.equal(body.loggedIn, true)
   const usage = services.get('subscriptionUsage')
@@ -214,7 +214,7 @@ test('usage HTTP endpoint queries only supported providers and reports auth erro
   const ctx = { get: () => ({ providers: ['openai-codex'], invalidate: id => seen.push(id), query: async () => { throw new QuotaError('auth-required', 'sign in first') } }) }
   async function call(provider) {
     let status, body
-    await handleLoginHttp(ctx, { method: 'GET', url: '/dsh-opencode-live-models/usage?provider=' + provider + '&refresh=1', headers: {} }, { writeHead: code => { status = code }, end: data => { body = JSON.parse(data) } })
+    await handleLoginHttp(ctx, { method: 'GET', url: '/dsh-providers-live-models/usage?provider=' + provider + '&refresh=1', headers: {} }, { writeHead: code => { status = code }, end: data => { body = JSON.parse(data) } })
     return { status, body }
   }
   assert.equal((await call('opencode')).status, 400)

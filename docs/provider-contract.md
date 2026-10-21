@@ -20,7 +20,7 @@ fail when one is skipped.
 
 ## 2. One row in the unified model catalog
 
-- The provider contributes a group to `GET /dsh-opencode-live-models/opendesign/routes`.
+- The provider contributes a group to `GET /dsh-providers-live-models/opendesign/routes`.
 - Channels of the same provider share one group, stacked as labelled sub-lists
   (OpenCode Go above OpenCode Zen). A provider with one channel still gets its own
   group.
@@ -40,7 +40,7 @@ the catalog above. The card exists to sign in and out.
 
 ## 4. Storage
 
-- Model switches: `.dsh-opencode-live-models/opendesign.json`, one
+- Model switches: `.dsh-providers-live-models/opendesign.json`, one
   `providers.<id>.disabledModels` entry per channel, plus the OpenDesign set at the
   top level. Only ids are stored.
 - Credentials: the host credential service. One record per provider; a provider

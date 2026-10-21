@@ -1,5 +1,5 @@
 {
-  "name": "dsh-opencode-live-models",
+  "name": "dsh-providers-live-models",
   "version": "0.12.0-rc.30",
   "description": "Live OpenCode and Codex catalogs, isolated OpenDesign sign-in, model routing and subscription balances",
   "license": "MIT",
@@ -22,11 +22,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Luca4Don3/dsh-opencode-live-models.git"
+    "url": "git+https://github.com/Luca4Don3/dsh-providers-live-models.git"
   },
-  "homepage": "https://github.com/Luca4Don3/dsh-opencode-live-models",
+  "homepage": "https://github.com/Luca4Don3/dsh-providers-live-models",
   "bugs": {
-    "url": "https://github.com/Luca4Don3/dsh-opencode-live-models/issues"
+    "url": "https://github.com/Luca4Don3/dsh-providers-live-models/issues"
   },
   "engines": {
     "node": ">=18"

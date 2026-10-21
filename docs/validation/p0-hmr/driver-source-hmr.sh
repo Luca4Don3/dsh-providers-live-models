@@ -1,7 +1,7 @@
 #!/bin/sh
 # Source-level HMR: modify plugin source while one DSH process runs.
 set -eu
-RUN_DIR='<server_path>/Workspace/dsh-opencode-live-models/.temp/p0-hmr-verify'
+RUN_DIR='<server_path>/Workspace/dsh-providers-live-models/.temp/p0-hmr-verify'
 cd "$RUN_DIR"
 rm -f run2.log driver2.log
 sh launch.sh > run2.log 2>&1 &

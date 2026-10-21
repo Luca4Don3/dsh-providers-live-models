@@ -1,4 +1,4 @@
-# dsh-opencode-live-models
+# dsh-providers-live-models
 
 English | [中文](README.zh-CN.md)
 
@@ -14,13 +14,13 @@ Codex retains its native transport and OAuth.
 **Desktop** — open **Plugins** in the sidebar, click **Add plugin**, paste the spec, then choose **Enable now** and restart DSH:
 
 ```
-github:Luca4Don3/dsh-opencode-live-models
+github:Luca4Don3/dsh-providers-live-models
 ```
 
 **CLI** — `add` both installs and selects the bundle; restart DSH to compose it:
 
 ```sh
-dsh plugin --profile desktop add github:Luca4Don3/dsh-opencode-live-models
+dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
 The `github:` spec downloads over HTTPS from codeload.github.com; an npm mirror does not proxy it, so the host needs reachable GitHub access.
@@ -85,7 +85,7 @@ config:
 The bridge gates on DSH 0.2.1-rc.2 with its own pi-ai 1.1.0 and resolves transport imports from the host. A mismatch disables only the new provider. Local login controls require a loopback, same-origin GUI.
 ## Login and subscription usage
 
-Open **Plugins** in the sidebar, then **dsh-opencode-live-models**. Its detail
+Open **Plugins** in the sidebar, then **dsh-providers-live-models**. Its detail
 page contains **Sign in with ChatGPT**, re-login, authorization status, callback
 paste fallback and cancellation.
 
@@ -138,7 +138,7 @@ grant never silently switches to another key or workspace.
 
 The documented device flow and refresh use only
 `https://opencode.ai/console/auth/device/*`. The host credential service stores an
-independent `dsh-opencode-live-models/opencode-console` grant; model API keys and
+independent `dsh-providers-live-models/opencode-console` grant; model API keys and
 Codex OAuth are not overwritten. Balance caches are scoped by workspace digest.
 Refresh tokens are single-use: a durable claim precedes the request, and an
 ambiguous failure or crash requires sign-in rather than replaying the token.

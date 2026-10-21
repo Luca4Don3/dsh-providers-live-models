@@ -39,7 +39,7 @@
 
 注意：验证导入发生在独立 PTC 工具进程，不是远程读取正在服务请求的宿主进程的模块缓存；没有借此证明所有第三方 adapter、所有 profile 及当前聊天所选路由都使用同一 Pi-AI 副本。插件实际 bare-import/HMR 解析仍须在真实组合验证。
 
-证据：[安装包元数据](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/package.json#L1>)、[Pi-AI 自身版本](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/package.json#L1>)。16 个源文件的 SHA-256 与归档内对应文件逐一一致，清单见 [证据清单](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-evidence.json>)。
+证据：[安装包元数据](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/package.json#L1>)、[Pi-AI 自身版本](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/package.json#L1>)。16 个源文件的 SHA-256 与归档内对应文件逐一一致，清单见 [证据清单](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-evidence.json>)。
 
 ## 3. P0-01 至 P0-10 验证矩阵
 
@@ -58,13 +58,13 @@
 
 ## 4. P0-02：当前 OpenAI 不支持 OAuth 的直接证据
 
-[原生 openai Provider](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/providers/openai.js#L5>) 仅有：
+[原生 openai Provider](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/providers/openai.js#L5>) 仅有：
 
 ~~~javascript
 auth: { apiKey: envApiKeyAuth("OpenAI API key", ["OPENAI_API_KEY"]) }
 ~~~
 
-[Models.login 的实际实现](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/models.js#L293>) 只有三个参数，没有第四个 LoginOptions；不存在的 OAuth 方法触发：
+[Models.login 的实际实现](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/models.js#L293>) 只有三个参数，没有第四个 LoginOptions；不存在的 OAuth 方法触发：
 
 ~~~text
 ModelsError / code=auth / OpenAI does not support oauth login
@@ -72,7 +72,7 @@ ModelsError / code=auth / OpenAI does not support oauth login
 
 这已在真实安装模块上执行，不是只看注释。安装 Pi-AI 文件内检索 getDeviceId/LoginOptions 无匹配，也没有 openai-chatgpt OAuth 模块。归档里出现的 Sign in with ChatGPT 文本含授权服务示例，不能据此判断 openai Provider 能力。
 
-[原生 Codex Provider](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js#L6>) 则明确声明 OAuth，模型协议为 openai-codex-responses，基础端点为 ChatGPT backend-api。它与 openai-responses / api.openai.com/v1 是不同的 Provider 与协议。
+[原生 Codex Provider](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js#L6>) 则明确声明 OAuth，模型协议为 openai-codex-responses，基础端点为 ChatGPT backend-api。它与 openai-responses / api.openai.com/v1 是不同的 Provider 与协议。
 
 之前关于「本机已经包含 OpenAI ChatGPT OAuth」的推断正式撤回；同样不能把官方主分支 UNSERVED_OAUTH 的问题当作本机问题。本机没有该屏蔽，但仍缺少底层能力。
 
@@ -80,7 +80,7 @@ ModelsError / code=auth / OpenAI does not support oauth login
 
 ### 5.1 公开存储与格式
 
-[recordKeyFor 与记录转换](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L1941>) 确认原生适配器使用两个独立地址：
+[recordKeyFor 与记录转换](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L1941>) 确认原生适配器使用两个独立地址：
 
 ~~~text
 llm-pi-ai/openai
@@ -89,7 +89,7 @@ llm-pi-ai/openai-codex
 
 记录为 api-key 时映射成 Pi-AI 的 api_key；记录为 grant 时直接返回 payload。存储接受 JSON 不代表 Provider 能消费该认证类型。每个地址保存一个当前记录，不是多账号仓库；API Key/OAuth 的切换会替换同一地址，未来实现不得未经确认覆盖已有凭据。
 
-[Codex 的 grant 构造](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js#L326>) 的结构如下，仅列字段，不含任何真实材料：
+[Codex 的 grant 构造](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js#L326>) 的结构如下，仅列字段，不含任何真实材料：
 
 ~~~typescript
 { kind: "grant", payload: {
@@ -103,7 +103,7 @@ llm-pi-ai/openai-codex
 
 accountId 从 access 中的账号声明派生；expires 由当前时间加 expires_in 秒换算为毫秒。实际传输也从 access 提取账号，不能靠随意修改 accountId 伪造账号一致性。
 
-[本地凭据服务](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js#L520>) 提供 readRecord、describeRecord、listRecords、modifyRecord、deleteRecord。modifyRecord 在文件锁内重读磁盘、执行 mutate、校验并原子写入，再发出 record-updated；**mutate 返回 undefined 表示保持现值，不是删除**。登出应走 deleteRecord。首轮 T 系列模拟该服务；本轮 S 系列运行真实服务，仅操作插件临时目录内的合成数据文件，不操作用户真实凭据文件。
+[本地凭据服务](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js#L520>) 提供 readRecord、describeRecord、listRecords、modifyRecord、deleteRecord。modifyRecord 在文件锁内重读磁盘、执行 mutate、校验并原子写入，再发出 record-updated；**mutate 返回 undefined 表示保持现值，不是删除**。登出应走 deleteRecord。首轮 T 系列模拟该服务；本轮 S 系列运行真实服务，仅操作插件临时目录内的合成数据文件，不操作用户真实凭据文件。
 
 ### 5.2 四层交接门禁
 
@@ -122,23 +122,23 @@ accountId 从 access 中的账号声明派生；expires 由当前时间加 expir
 
 ## 6. 认证优先级与冲突场景
 
-[宿主 resolveApiKey](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L2563>) 与 [Pi-AI 认证解析](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/resolve.js#L20>) 及 [标准 API Key 解析](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/helpers.js#L1>) 联合决定：
+[宿主 resolveApiKey](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L2563>) 与 [Pi-AI 认证解析](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/resolve.js#L20>) 及 [标准 API Key 解析](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/helpers.js#L1>) 联合决定：
 
 1. 配置了 apiKeyEnv：宿主必须先解析指定引用；存在且有效就作为显式 apiKey 传给 Pi-AI，不存在则 MISSING_CREDENTIAL，**不回退 OAuth**。T04/T05。
-2. Pi-AI 对显式 apiKey 的优先处理以 Provider 存在 apiKey handler 为前提。原生 openai 有；宿主对带 apiKeyEnv 的 OAuth-only Codex 路由会增加一个 key handler，所以这里 Codex 也可被覆盖。T16，[routeAuth 的条件分支](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L861>)。
+2. Pi-AI 对显式 apiKey 的优先处理以 Provider 存在 apiKey handler 为前提。原生 openai 有；宿主对带 apiKeyEnv 的 OAuth-only Codex 路由会增加一个 key handler，所以这里 Codex 也可被覆盖。T16，[routeAuth 的条件分支](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L861>)。
 3. 无显式 apiKey 时先读 Provider 的存储记录：OAuth 需对应 oauth handler；API Key 需 apiKey handler。记录类型不受支持时拒绝，**不会悄悄读环境变量**。T02/T03。
 4. 已存 API Key 优先于 Provider 环境发现。T06。
 5. 没有记录才读 OPENAI_API_KEY 等原生环境发现。T07。
 6. 已存 OAuth 刷新失败不回退 API Key，不覆盖旧记录。T12。
 7. Pi-AI 直接调用中的显式 apiKey 同样优先，T17；宿主是否暴露相同的逐请求输入不能由此推断。
 
-凭据引用服务自身还有来源优先级：继承的启动环境 > 管理存储 > 调用目录 dotenv > DSH home dotenv（[分层定义](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js#L13>)、[实际 resolve 实现](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js#L473>)）。这一分层只读源码，未查看用户真实值；不能通过 UI 写入较低优先级值就声称已覆盖启动环境。
+凭据引用服务自身还有来源优先级：继承的启动环境 > 管理存储 > 调用目录 dotenv > DSH home dotenv（[分层定义](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js#L13>)、[实际 resolve 实现](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js#L473>)）。这一分层只读源码，未查看用户真实值；不能通过 UI 写入较低优先级值就声称已覆盖启动环境。
 
 不能把「API Key 与 OAuth 同时存在」理解成同一记录同时存两者：本次是 OAuth record 与 apiKeyEnv/环境引用并存。T04/T16 已证明实际选择的可以是 Key，而不是 OAuth。
 
 ## 7. P0-07：请求级观测与测试结果
 
-[诊断脚本](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-runtime-probe.mjs>) 与 [脱敏结果](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-runtime-results.json>) 为首轮诊断材料，不接入插件入口、bundle、配置或发布脚本；本轮新增真实服务诊断见第 7.1 节。
+[诊断脚本](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-runtime-probe.mjs>) 与 [脱敏结果](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-runtime-results.json>) 为首轮诊断材料，不接入插件入口、bundle、配置或发布脚本；本轮新增真实服务诊断见第 7.1 节。
 
 测试使用当前 Electron/PTC 的实际安装模块；通过原生 apply 注册到模拟 registry 的 adapter 发起调用，原生 SDK 的 fetch 被仅在该工具进程内替换。该首轮的合成 Token 仅存内存；没有读取、导出或写入用户 Token。观测后 HTTP 返回固定 mock 400，故**没有成功推理的主张**。
 
@@ -169,11 +169,11 @@ const result = await runP0Probe("file://<application_resources>/app.asar/dsh/nod
 console.log(JSON.stringify(result, null, 2))
 ~~~
 
-最终 17/17 通过，fetch 已恢复，真实网络请求与真实凭据读写均为 0。第一轮诊断有 4 项断言失败，原因是探针起初只观察异常抛出，漏掉了适配器 finish/error 流内失败；按 [适配器错误映射](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L1457>) 修正诊断后通过。没有修改宿主来迎合测试。
+最终 17/17 通过，fetch 已恢复，真实网络请求与真实凭据读写均为 0。第一轮诊断有 4 项断言失败，原因是探针起初只观察异常抛出，漏掉了适配器 finish/error 流内失败；按 [适配器错误映射](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js#L1457>) 修正诊断后通过。没有修改宿主来迎合测试。
 
 ## 7.1 本轮补充：真实公开服务与隔离磁盘（20/20）
 
-新增 [真实服务诊断脚本](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-public-services-probe.mjs>) 与 [脱敏结果](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-public-services-results.json>)。仍只使用内置 Pi-AI 0.87.1，没有新增依赖或开发插件功能。
+新增 [真实服务诊断脚本](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-public-services-probe.mjs>) 与 [脱敏结果](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-public-services-results.json>)。仍只使用内置 Pi-AI 0.87.1，没有新增依赖或开发插件功能。
 
 区别于首轮：本轮使用安装归档内的真实 Cordis Context/Fiber、LocalCredentialProvider、AuthorizationService、Models、原生 adapter 与 SDK；合成数据通过公开凭据接口真正写入插件临时目录的 owner-only 文件。没有复用运行宿主的 Context、profile、配置或用户凭据文件。LLM registry 仍为诊断替身，所有外部 HTTP 为 mock，最终模型 HTTP 固定返回 400。
 
@@ -209,11 +209,11 @@ console.log(JSON.stringify(result, null, 2))
 
 ## 8. 刷新、重启和生命周期
 
-[Pi-AI OAuth 刷新规则](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/resolve.js#L62>) 在剩余有效期不足五分钟时触发刷新，通过 store.modify 内二次检查避免重复刷新；刷新超时为 15 秒。[Codex 刷新接口](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js#L127>) 使用原生 refresh_token grant。S07/S20 已用真实磁盘与两个独立服务实例验证文件锁及刷新去重，但实例同属一个进程，仍没有多进程演练。
+[Pi-AI OAuth 刷新规则](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/resolve.js#L62>) 在剩余有效期不足五分钟时触发刷新，通过 store.modify 内二次检查避免重复刷新；刷新超时为 15 秒。[Codex 刷新接口](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js#L127>) 使用原生 refresh_token grant。S07/S20 已用真实磁盘与两个独立服务实例验证文件锁及刷新去重，但实例同属一个进程，仍没有多进程演练。
 
 P0-08 不放行：未用真实账号刷新、未证明刷新后服务端接受认证，也未重启 DSH。稳定 device UUID 在本机 openai 根本没有对应 API，因此本阶段没有创建 UUID 文件；未来支持新版登录时应由插件持久化且验证重启/并发语义。
 
-[授权注册与 disposer](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-authorization/lib/index.js#L75>) 撤销注册时删除 flow 并取消尝试，S13/S16 已在真实隔离 Cordis 中验证；SlotCore.register 返回可递归撤销的 disposer，S18/S19 只验证其纯注册器行为，不能外推 React 卸载或插件 HMR。当前 v0.5.0 的 [运行时恢复代码](<<server_path>/Workspace/dsh-opencode-live-models/lib/index.js#L1735>) 会恢复自己持有的 adapter/provider/prototype 包装，[卸载钩子](<<server_path>/Workspace/dsh-opencode-live-models/lib/index.js#L2182>) 清理 interval 并推进 generation，防止旧任务重新发布。源码存在不等于所有 HMR/取消路径已经通过真实组合测试；没有把这些主张标为 PASS。
+[授权注册与 disposer](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-authorization/lib/index.js#L75>) 撤销注册时删除 flow 并取消尝试，S13/S16 已在真实隔离 Cordis 中验证；SlotCore.register 返回可递归撤销的 disposer，S18/S19 只验证其纯注册器行为，不能外推 React 卸载或插件 HMR。当前 v0.5.0 的 [运行时恢复代码](<<server_path>/Workspace/dsh-providers-live-models/lib/index.js#L1735>) 会恢复自己持有的 adapter/provider/prototype 包装，[卸载钩子](<<server_path>/Workspace/dsh-providers-live-models/lib/index.js#L2182>) 清理 interval 并推进 generation，防止旧任务重新发布。源码存在不等于所有 HMR/取消路径已经通过真实组合测试；没有把这些主张标为 PASS。
 
 本次未向运行宿主或 profile 安装任何功能；S 系列只在独立工具进程的新 Context 中挂载真实内置服务和诊断用注册。没有修改主宿主的 registry、监听器、定时器或原型。所有诊断 Context 均已 dispose，fetch 在 finally 恢复。
 
@@ -223,14 +223,14 @@ P0-08 不放行：未用真实账号刷新、未证明刷新后服务端接受�
 
 - 凭据公开服务：readRecord/describeRecord/listRecords/modifyRecord/deleteRecord；引用 resolve/describe/set/unset。
 - 授权公开服务：registerFlow/list/describe/begin/cancel。它只负责交互与生命周期，不补齐 Provider 缺失的认证实现。
-- UI：安装版实际 [Models Slot 声明](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js#L4059>) 包含 settings.models.provider-card（keyed）与 settings.models.footer（list）；存在 settings.section 声明；实际插件设置页注册和渲染未测，不声称 UI 验收通过。
+- UI：安装版实际 [Models Slot 声明](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js#L4059>) 包含 settings.models.provider-card（keyed）与 settings.models.footer（list）；存在 settings.section 声明；实际插件设置页注册和渲染未测，不声称 UI 验收通过。
 - Pi-AI：Models.login、getAuth、setProvider 与可注入 CredentialStore 确认存在；本次直接访问安装文件只为诊断，生产插件不得硬编码该安装路径或依赖未导出的 dist 子路径。
 
 ### 9.2 不允许采用的方案
 
 1. 不改 DSH，不删除 UNSERVED_OAUTH，不替换内置 Pi-AI，不修改内置 UI，不要求用户打补丁。
 2. 不重复注册 llm-pi-ai/openai flow；会 DUPLICATE_FLOW。
-3. **不使用自有 flow key、却只写另一个凭据 key 来绕过冲突**：[提交观察与 NOT_COMMITTED 校验](<<server_path>/Workspace/dsh-opencode-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-authorization/lib/index.js#L202>) 只承认该 flow 自己的 key 在本次尝试内提交。此前这条建议不成立，正式撤回。不制造虚假辅助记录来骗过校验。
+3. **不使用自有 flow key、却只写另一个凭据 key 来绕过冲突**：[提交观察与 NOT_COMMITTED 校验](<<server_path>/Workspace/dsh-providers-live-models/.temp/p0/host/dsh/node_modules/@deepseek-ai/dsh-authorization/lib/index.js#L202>) 只承认该 flow 自己的 key 在本次尝试内提交。此前这条建议不成立，正式撤回。不制造虚假辅助记录来骗过校验。
 4. 不把 OAuth access 当成普通 API Key 注入旧 openai Provider，也不通过改 baseURL 将不同认证和协议混用。
 5. 不重复注册现有 openai adapter，不抢占 Provider。
 6. 不把文档示例、package.json 依赖范围、登录状态、成功写记录或模拟 HTTP 结果当成真实模型请求已使用 OAuth。
@@ -262,7 +262,7 @@ v0.5.0 现有模型动态更新使用私有 ctx.llm.adapters、adapter.current()
 
 ## 12. P0-E2E-CODEX：真实账号端到端验证
 
-执行日期：2026-10-15。方式：DSH 官方支持的命名 profile（`codex-e2e`，`dsh.profile.bundles: []`，临时 bundle 仅位于被忽略的临时目录），干净环境（env -i、隔离 DSH_HOME/cwd/HOME/TMPDIR/XDG_*）、内置 Pi-AI 0.87.1、仅注册原生 `openai-codex` 一条路由、无 `apiKeyEnv`。用户在本机浏览器以测试账号完成真实授权；验证进程仅对已存凭据做 exact-match 校验，Token 与回调材料不落日志与证据。证据共 16 份：[归档目录](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-e2e-codex/>)。
+执行日期：2026-10-15。方式：DSH 官方支持的命名 profile（`codex-e2e`，`dsh.profile.bundles: []`，临时 bundle 仅位于被忽略的临时目录），干净环境（env -i、隔离 DSH_HOME/cwd/HOME/TMPDIR/XDG_*）、内置 Pi-AI 0.87.1、仅注册原生 `openai-codex` 一条路由、无 `apiKeyEnv`。用户在本机浏览器以测试账号完成真实授权；验证进程仅对已存凭据做 exact-match 校验，Token 与回调材料不落日志与证据。证据共 16 份：[归档目录](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-e2e-codex/>)。
 
 ### 12.1 三个独立门禁
 
@@ -299,7 +299,7 @@ v0.5.0 现有模型动态更新使用私有 ctx.llm.adapters、adapter.current()
 
 **429 额度耗尽场景已是 PASS，不构成待修复问题，也不再重复测试。**
 
-**E05-B 已于 2026-10-15 补测完成（PASS）**：配额窗口重置后，经隔离 profile 与真实浏览器授权（原生 authorization 流程），`gpt-6-sol` 一次 marker 推理返回 **HTTP 200**，marker 精确回显（43 字符，SHA-256 记录）、usage 齐全、31 chunks 正常 `stop` 结束；请求前逐字节校验 Bearer 与账号头（stored-oauth exact-match），无 OpenCode header。证据：[docs/validation/p0-e05b/](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-e05b/>)。P0-CODEX 自此全链路 PASS。 剩余仅一项补充验证：配额恢复后按本节记录重建隔离 profile（临时目录已按第 13 节清理），跑一次 `call` 取得 status 200 与 marker 回显（响应仅记录长度与 SHA-256），把「额度充足时正常推理」从 NOT TESTED 补齐为 PASS。此项不阻塞认证链路结论，属配额恢复后的增量验证。
+**E05-B 已于 2026-10-15 补测完成（PASS）**：配额窗口重置后，经隔离 profile 与真实浏览器授权（原生 authorization 流程），`gpt-6-sol` 一次 marker 推理返回 **HTTP 200**，marker 精确回显（43 字符，SHA-256 记录）、usage 齐全、31 chunks 正常 `stop` 结束；请求前逐字节校验 Bearer 与账号头（stored-oauth exact-match），无 OpenCode header。证据：[docs/validation/p0-e05b/](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-e05b/>)。P0-CODEX 自此全链路 PASS。 剩余仅一项补充验证：配额恢复后按本节记录重建隔离 profile（临时目录已按第 13 节清理），跑一次 `call` 取得 status 200 与 marker 回显（响应仅记录长度与 SHA-256），把「额度充足时正常推理」从 NOT TESTED 补齐为 PASS。此项不阻塞认证链路结论，属配额恢复后的增量验证。
 
 ### 12.5 边界
 
@@ -332,7 +332,7 @@ Codex CLI 源码证实 ChatGPT 后端查询路径为 `{base}/wham/usage`（`Path
 
 隔离 profile（`codex-quota`，仅 credentials/authorization/llm-pi-ai）+ 只读插件（仅两个 GET，无推理、无重置消费）。浏览器授权成功后同进程执行查询，随后用已存凭据再次独立查询，两次均 **200/200**。
 
-归一化结果（脱敏证据：[docs/validation/p0-q/](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-q/>)）：
+归一化结果（脱敏证据：[docs/validation/p0-q/](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-q/>)）：
 
 | 字段 | 实测值 |
 |---|---|
@@ -424,7 +424,7 @@ P0-Q 结论仅覆盖 OpenAI Codex 的额度查询只读链路；OpenCode Go/Kimi
 
 ### 14.11 参考对照文档
 
-三项目固定提交与职责边界、OAuth/额度对照、结构差异与认证要求见 [docs/p0-q-reference-map.md](<<server_path>/Workspace/dsh-opencode-live-models/docs/p0-q-reference-map.md>)。
+三项目固定提交与职责边界、OAuth/额度对照、结构差异与认证要求见 [docs/p0-q-reference-map.md](<<server_path>/Workspace/dsh-providers-live-models/docs/p0-q-reference-map.md>)。
 
 ### 14.12 账号身份键规则与解析回归测试（问题修正）
 
@@ -451,9 +451,9 @@ P0-Q 结论仅覆盖 OpenAI Codex 的额度查询只读链路；OpenCode Go/Kimi
 | round2 uninstall | **73** | **30** | **独立 Loader 进程在移除插件配置后正确回落内置基线**（同进程卸载无残留仍需单独验证） |
 | round3 reinstall | 84 | 34 | 重装再次生效（7.0s 稳定） |
 
-providers 在三轮中均为 `[opencode, opencode-go]`，观察器退出正常，无 `failed to import`/`did not activate`。证据：[docs/validation/p0-lifecycle/](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-lifecycle/>)。
+providers 在三轮中均为 `[opencode, opencode-go]`，观察器退出正常，无 `failed to import`/`did not activate`。证据：[docs/validation/p0-lifecycle/](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-lifecycle/>)。
 
-**这补上了第 3 章 P0-10 缺失的「真实 profile 安装/卸载/重装」项——三轮均为独立 DSH 进程，只证明跨进程的配置切换正确性；其中「同一运行中进程的禁用/重装与配置 HMR」已由第 16 章补测通过**。仍未覆盖：源码级 HMR（代码监视）、React/UI 层、进行中的额度请求取消。复现观察器脚本见 [docs/validation/p0-lifecycle-observer.mjs](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-lifecycle-observer.mjs>)。
+**这补上了第 3 章 P0-10 缺失的「真实 profile 安装/卸载/重装」项——三轮均为独立 DSH 进程，只证明跨进程的配置切换正确性；其中「同一运行中进程的禁用/重装与配置 HMR」已由第 16 章补测通过**。仍未覆盖：源码级 HMR（代码监视）、React/UI 层、进行中的额度请求取消。复现观察器脚本见 [docs/validation/p0-lifecycle-observer.mjs](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-lifecycle-observer.mjs>)。
 
 ### 15.2 多账号隔离（合成层，T17–T19）
 
@@ -490,7 +490,7 @@ probe 全套（main 基线 174 条）+ PR #4 的 176 条与三轮真实 Loader �
 | 3 | **73** | **30** | **同进程 disabled：补丁写入后 ~3s 回落** |
 | 4 | **84** | **34** | **同进程 re-enable：~4s 恢复** |
 
-全程单进程（PID 80214 未变），启动零 entry 失败，SIGINT 优雅退出。证据：[docs/validation/p0-hmr/](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-hmr/>)。
+全程单进程（PID 80214 未变），启动零 entry 失败，SIGINT 优雅退出。证据：[docs/validation/p0-hmr/](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-hmr/>)。
 
 **结论**：同进程 disabled 触发该 entry 的 Fiber dispose —— 计数回落证明主插件的 unpatch/包装恢复在**运行中进程**内生效（overlay 消失），重新 enable 后 overlay 恢复；配置级 HMR（patch 热重载）可用。
 
@@ -533,9 +533,9 @@ probe 全套（main 基线 174 条）+ PR #4 的 176 条与三轮真实 Loader �
 
 **以上逐项闭合前，P1（统一额度引擎）不获放行；P0-Q PASS 不改变总门禁。** 本评估不引入任何 DSH 修改或新依赖。
 
-若不愿等待 openai 兼容项（宿主限制、当前无解），可审议**限定范围实施门禁**（Codex + OpenCode Go 两家已验证 Provider 的独立额度插件）：[docs/p0-scope-gate.md](<<server_path>/Workspace/dsh-opencode-live-models/docs/p0-scope-gate.md>)——**状态：待用户明确批准，不自动生效**；openai 不兼容项保留在 P0 总门禁中。
+若不愿等待 openai 兼容项（宿主限制、当前无解），可审议**限定范围实施门禁**（Codex + OpenCode Go 两家已验证 Provider 的独立额度插件）：[docs/p0-scope-gate.md](<<server_path>/Workspace/dsh-providers-live-models/docs/p0-scope-gate.md>)——**状态：待用户明确批准，不自动生效**；openai 不兼容项保留在 P0 总门禁中。
 ### 16.1 源码级 HMR 实测（P1，结果 NOT ESTABLISHED）
 
 目标：在 hmr 的 `root` 指向插件源码时，修改运行中进程加载的 lib/index.js，观察模块重载。两轮实测（`root` = 真实路径 / loader 加载的 symlink 路径）：配置级监视有效（disabled 切换已由 16 章证明），但源码文件修改后**无任何重载信号**——counts 保持 84/34、无 reload 日志、观察器未重启。
 
-**结论：NOT ESTABLISHED。** 该链路（chokidar 事件 → 分类 → loadCache 归属 → 模块替换）位于宿主 dsh-hmr 内部；在 DSH 零修改红线下不对其做侵入式排查，也不将 link-bundle 隔离环境的失败归因于插件缺陷。证据与驱动脚本归档于 [docs/validation/p0-hmr/](<<server_path>/Workspace/dsh-opencode-live-models/docs/validation/p0-hmr/>)（source-hmr-*）。配置级 HMR（16 章）不受影响，仍为 PASS。
+**结论：NOT ESTABLISHED。** 该链路（chokidar 事件 → 分类 → loadCache 归属 → 模块替换）位于宿主 dsh-hmr 内部；在 DSH 零修改红线下不对其做侵入式排查，也不将 link-bundle 隔离环境的失败归因于插件缺陷。证据与驱动脚本归档于 [docs/validation/p0-hmr/](<<server_path>/Workspace/dsh-providers-live-models/docs/validation/p0-hmr/>)（source-hmr-*）。配置级 HMR（16 章）不受影响，仍为 PASS。

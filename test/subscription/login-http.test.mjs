@@ -38,7 +38,7 @@ async function call(ctx, method, path, body, options) {
 
 test('GET status reports signed-out state', async () => {
   cancelLogin('cleanup')
-  const r = await call(fakeCtx(), 'GET', '/dsh-opencode-live-models/status')
+  const r = await call(fakeCtx(), 'GET', '/dsh-providers-live-models/status')
   assert.equal(r.status, 200)
   assert.equal(r.body.loggedIn, false)
   assert.equal(r.body.login, null)
@@ -46,7 +46,7 @@ test('GET status reports signed-out state', async () => {
 
 test('POST login returns the URL and keeps waiting in background', async () => {
   cancelLogin('cleanup')
-  const r = await call(fakeCtx({ hanging: true }), 'POST', '/dsh-opencode-live-models/login', undefined, { openBrowser: false })
+  const r = await call(fakeCtx({ hanging: true }), 'POST', '/dsh-providers-live-models/login', undefined, { openBrowser: false })
   assert.equal(r.status, 200)
   assert.match(r.body.openUrl, /^https:\/\/auth\.openai\.com\//)
   assert.equal(r.body.login && r.body.login.status, 'waiting')
@@ -55,15 +55,15 @@ test('POST login returns the URL and keeps waiting in background', async () => {
 
 test('POST code without a pending prompt is 409, empty value 400', async () => {
   cancelLogin('cleanup')
-  const c = await call(fakeCtx(), 'POST', '/dsh-opencode-live-models/code', { value: 'x' })
+  const c = await call(fakeCtx(), 'POST', '/dsh-providers-live-models/code', { value: 'x' })
   assert.equal(c.status, 409)
   assert.equal(c.body.ok, false)
-  const e = await call(fakeCtx(), 'POST', '/dsh-opencode-live-models/code', { value: '   ' })
+  const e = await call(fakeCtx(), 'POST', '/dsh-providers-live-models/code', { value: '   ' })
   assert.equal(e.status, 400)
 })
 
 test('unknown route is 404', async () => {
-  const r = await call(fakeCtx(), 'GET', '/dsh-opencode-live-models/nope')
+  const r = await call(fakeCtx(), 'GET', '/dsh-providers-live-models/nope')
   assert.equal(r.status, 404)
 })
 
@@ -76,12 +76,12 @@ test('OpenCode login endpoints are separate from Codex and expose only safe logi
   }
   const options = { consoleAuth, openBrowser: false }
   const ctx = { get() { assert.fail('must not invoke native Codex login') } }
-  assert.equal((await call(ctx, 'GET', '/dsh-opencode-live-models/opencode/status', undefined, options)).body.loggedIn, false)
-  const started = await call(ctx, 'POST', '/dsh-opencode-live-models/opencode/login', undefined, options)
+  assert.equal((await call(ctx, 'GET', '/dsh-providers-live-models/opencode/status', undefined, options)).body.loggedIn, false)
+  const started = await call(ctx, 'POST', '/dsh-providers-live-models/opencode/login', undefined, options)
   assert.equal(started.body.login.userCode, 'TEST-CODE')
-  const ended = await call(ctx, 'POST', '/dsh-opencode-live-models/opencode/cancel', undefined, options)
+  const ended = await call(ctx, 'POST', '/dsh-providers-live-models/opencode/cancel', undefined, options)
   assert.equal(ended.body.login.status, 'cancelled')
-  assert.equal((await call(ctx, 'GET', '/dsh-opencode-live-models/opencode/status')).status, 503)
+  assert.equal((await call(ctx, 'GET', '/dsh-providers-live-models/opencode/status')).status, 503)
 })
 
 test('subscription list keeps four providers including OpenDesign and excludes official DeepSeek', async () => {
@@ -97,17 +97,17 @@ test('subscription list keeps four providers including OpenDesign and excludes o
   const r = await call({ get: name => {
     assert.equal(name, 'subscriptionUsage')
     return { freshMs: 300000, configured: async () => configured, query() { assert.fail('listing must not query quota') } }
-  } }, 'GET', '/dsh-opencode-live-models/subscriptions')
+  } }, 'GET', '/dsh-providers-live-models/subscriptions')
   assert.equal(r.status, 200)
   assert.deepEqual(r.body.subscriptions, configured.slice(2, 6))
   assert.equal(r.body.freshMs, 300000)
 })
 
 test('subscription list explicitly reports a missing service or credential discovery failure', async () => {
-  const missing = await call({ get() {} }, 'GET', '/dsh-opencode-live-models/subscriptions')
+  const missing = await call({ get() {} }, 'GET', '/dsh-providers-live-models/subscriptions')
   assert.equal(missing.status, 503)
   assert.equal(missing.body.error, 'unavailable')
-  const failed = await call({ get: () => ({ configured() { throw new Error('fixture credentials unavailable') } }) }, 'GET', '/dsh-opencode-live-models/subscriptions')
+  const failed = await call({ get: () => ({ configured() { throw new Error('fixture credentials unavailable') } }) }, 'GET', '/dsh-providers-live-models/subscriptions')
   assert.equal(failed.status, 500)
   assert.equal(failed.body.detail, 'fixture credentials unavailable')
 })

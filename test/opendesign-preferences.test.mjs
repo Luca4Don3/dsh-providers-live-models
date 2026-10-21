@@ -36,7 +36,7 @@ test('discovery returns the directory that owns node_modules, not the package', 
   // cordis.patch.yml, so a naive ancestor walk stopped there and wrote inside
   // node_modules, where a reinstall deletes the file.
   const root = dir()
-  const pkg = join(root, 'node_modules', 'dsh-opencode-live-models')
+  const pkg = join(root, 'node_modules', 'dsh-providers-live-models')
   mkdirSync(join(pkg, 'lib'), { recursive: true })
   writeFileSync(join(root, 'cordis.patch.yml'), '[]\n')
   writeFileSync(join(pkg, 'cordis.patch.yml'), '[]\n')

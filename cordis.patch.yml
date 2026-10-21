@@ -1,6 +1,6 @@
-# dsh-opencode-live-models — bundle patch: mount the host plugin under its
+# dsh-providers-live-models — bundle patch: mount the host plugin under its
 # package name, resolved through the profile's node_modules by
-# `dsh plugin --profile <name> add dsh-opencode-live-models`.
+# `dsh plugin --profile <name> add dsh-providers-live-models`.
 #
 # The plugin reaches the running pi-ai instance through `ctx.llm.adapters`, a
 # TypeScript-private field that is an ordinary Map at runtime, and imports
@@ -9,4 +9,4 @@
 # cannot. See the module header.
 - insert:
     - id: opencode-live-models
-      name: dsh-opencode-live-models
+      name: dsh-providers-live-models

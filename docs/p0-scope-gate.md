@@ -12,7 +12,7 @@ P0 总门禁包含原生 `openai` ChatGPT OAuth 项，其不兼容源于 DSH 内
 |---|---|
 | OpenAI Codex 额度（原生 OAuth，wham/usage 200 已验证） | OpenAI ChatGPT OAuth（INCOMPATIBLE，保持研究项） |
 | OpenCode Go 额度（OPENCODE_GO_API_KEY，/zen/go/v1/usage 200 已验证） | Kimi / Grok / Zen / DeepSeek 等（后续批次独立验收） |
-| 独立插件 `dsh-subscription-usage`（只读额度查询与展示） | 模型动态更新职责（留在 dsh-opencode-live-models） |
+| 独立插件 `dsh-subscription-usage`（只读额度查询与展示） | 模型动态更新职责（留在 dsh-providers-live-models） |
 | 额度重置 / Credits 消费等写操作 | （全部排除：只读为默认，写操作不在本门禁） |
 
 ## 验收门禁（依据既定十项标准，当前状态）

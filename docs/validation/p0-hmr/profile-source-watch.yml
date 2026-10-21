@@ -13,7 +13,7 @@
     - id: hmr
       name: '@deepseek-ai/dsh-hmr'
       config:
-        root: ['<server_path>/Workspace/dsh-opencode-live-models/.temp/p0-hmr-verify/plugin/lib']
+        root: ['<server_path>/Workspace/dsh-providers-live-models/.temp/p0-hmr-verify/plugin/lib']
     - id: p0-hmr-watch-observer
       name: dsh-p0-hmr-watch-observer
       config:

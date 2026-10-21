@@ -42,6 +42,7 @@ const isCode = code => error => error instanceof QuotaError && error.code === co
 test('OpenDesign origins and plugin-owned credential scope are fixed', () => {
   assert.equal(CONTROL_ORIGIN, 'https://amr-api.open-design.ai')
   assert.equal(MODEL_ORIGIN, 'https://amr-link.open-design.ai')
+  // Historic id, deliberately kept across the package rename so existing sign-ins stay valid.
   assert.equal(OPENDESIGN_RECORD, 'dsh-opencode-live-models/opendesign')
 })
 
@@ -56,7 +57,7 @@ test('device start and poll use community JSON paths, interval and both separate
       assert.equal(init.headers['content-type'], 'application/json')
       const body = JSON.parse(init.body)
       if (url.endsWith('/device-authorizations')) {
-        assert.deepEqual(body, { cliVersion: '0.1.4', host: 'dsh-opencode-live-models', profile: 'prod' })
+        assert.deepEqual(body, { cliVersion: '0.1.4', host: 'dsh-providers-live-models', profile: 'prod' })
         return Response.json(challenge, { status: 201 })
       }
       assert.equal(url, CONTROL_ORIGIN + '/api/v1/cli/device-authorizations/device%2Ffixture/token')

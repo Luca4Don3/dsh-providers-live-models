@@ -29,7 +29,7 @@ test('OpenCode official device flow respects pending and slow_down, then saves o
     assert.equal(options.redirect, 'error')
     assert.equal(options.headers.authorization, undefined)
     const body = new URLSearchParams(options.body)
-    assert.equal(body.get('client_id'), 'dsh-opencode-live-models')
+    assert.equal(body.get('client_id'), 'dsh-providers-live-models')
     if (url === 'https://opencode.ai/console/auth/device/code') {
       assert.equal(body.get('supports_org_scope'), 'true')
       return Response.json(challenge)
