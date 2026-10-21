@@ -64,6 +64,25 @@ Requires DSH 0.1.5-rc.1 or newer, and **0.3.0 or newer of this plugin**.
 > the picker keeps showing models the plugin is no longer maintaining. Upgrading
 > in place is enough; existing installs do not need to be removed first.
 
+## OpenDesign (0.12.0-rc.1 prerelease)
+
+The plugin detail page offers a separate **OpenDesign Cloud** card. Saving an API key or completing device authorization changes only the plugin-owned OpenDesign grant; it does not read the desktop app's credentials, run `vela`, or scan session histories. API-key mode supports model calls, account authorization adds quota and wallet reads.
+
+The provider id is `opendesign`. Its live catalog is scoped to the active credential, and no static roster is treated as an account's entitlement. Chat Completions is the default, following the supplied DSH reference plugin; Responses is an explicit alternative. Existing OpenCode per-model protocols and the native Codex transport are unchanged.
+
+```yaml
+config:
+  openDesign:
+    enabled: true
+    protocol: chat-completions # or responses
+    outputTokenBudget: 8192    # local request budget, not a vendor capability
+    stripTemperature: false    # drop temperature only for OpenDesign requests
+    quotaSource: auto          # auto | vela | control
+```
+
+`stripTemperature` is off by default. Enabled, it removes only the `temperature` member from request bodies sent to OpenDesign; every other field is untouched. The Auto preset's reviewer always sends `temperature: 0`, so switching a session to an OpenDesign model can turn that into a failed tool call; this switch fixes that path without editing the reviewer or affecting any other provider. The cost is that an explicit temperature is also dropped for OpenDesign requests.
+
+The bridge gates on DSH 0.2.1-rc.2 with its own pi-ai 1.1.0 and resolves transport imports from the host. A mismatch disables only the new provider. Local login controls require a loopback, same-origin GUI.
 ## Login and subscription usage
 
 Open **Plugins** in the sidebar, then **dsh-opencode-live-models**. Its detail
@@ -72,7 +91,7 @@ paste fallback and cancellation.
 
 Open **Settings → Account & balance** to see subscription balances below the
 official DeepSeek balance. Only subscriptions with configured credentials are
-queried and displayed, with at most three providers and no duplicate DeepSeek card.
+queried and displayed, with at most four providers and no duplicate DeepSeek card.
 OpenAI and OpenCode Go percentage cards appear first, followed by full-width
 OpenCode Zen monetary balance rows at the bottom. They load on entry and offer
 **Refresh usage**, showing remaining quota percentages and reset times rather

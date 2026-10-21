@@ -84,21 +84,22 @@ test('OpenCode login endpoints are separate from Codex and expose only safe logi
   assert.equal((await call(ctx, 'GET', '/dsh-opencode-live-models/opencode/status')).status, 503)
 })
 
-test('subscription list excludes official DeepSeek and limits configured subscriptions to three', async () => {
+test('subscription list keeps four providers including OpenDesign and excludes official DeepSeek', async () => {
   const configured = [
     { providerId: 'deepseek', label: 'DeepSeek' },
     { providerId: 'deepseek-official', label: 'DeepSeek official' },
     { providerId: 'openai-codex', label: 'OpenAI Codex' },
     { providerId: 'opencode-go', label: 'OpenCode Go' },
-    { providerId: 'fixture-third', label: 'Third' },
-    { providerId: 'fixture-fourth', label: 'Fourth' },
+    { providerId: 'opencode', label: 'OpenCode Zen' },
+    { providerId: 'opendesign', label: 'OpenDesign' },
+    { providerId: 'fixture-fifth', label: 'Fifth' },
   ]
   const r = await call({ get: name => {
     assert.equal(name, 'subscriptionUsage')
     return { freshMs: 300000, configured: async () => configured, query() { assert.fail('listing must not query quota') } }
   } }, 'GET', '/dsh-opencode-live-models/subscriptions')
   assert.equal(r.status, 200)
-  assert.deepEqual(r.body.subscriptions, configured.slice(2, 5))
+  assert.deepEqual(r.body.subscriptions, configured.slice(2, 6))
   assert.equal(r.body.freshMs, 300000)
 })
 

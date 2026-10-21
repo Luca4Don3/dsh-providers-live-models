@@ -1,7 +1,7 @@
 {
   "name": "dsh-opencode-live-models",
-  "version": "0.11.3",
-  "description": "Live model catalogs, native model selection, ChatGPT and OpenCode Console sign-in, subscription usage and Zen balances",
+  "version": "0.12.0-rc.30",
+  "description": "Live OpenCode and Codex catalogs, isolated OpenDesign sign-in, model routing and subscription balances",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -17,7 +17,8 @@
   },
   "files": [
     "lib",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "docs/*.md"
   ],
   "repository": {
     "type": "git",
@@ -48,11 +49,9 @@
     }
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
     "react": "*"
   },
   "peerDependenciesMeta": {
-    "@earendil-works/pi-ai": { "optional": true },
     "react": { "optional": true }
   }
 }

@@ -124,6 +124,12 @@ function elements(node) {
   return node && typeof node === 'object' ? [node, ...(node.children ?? []).flatMap(elements)] : []
 }
 
+const expandAll = ui => {
+  // Two levels: the provider group, then the channel inside it.
+  for (const button of elements(ui.render()).filter(node => node.props?.['data-toggle-group'])) button.props.onClick({ preventDefault() {} })
+  for (const button of elements(ui.render()).filter(node => node.props?.['data-toggle-route'])) button.props.onClick({ preventDefault() {} })
+  return elements(ui.render())
+}
 const tick = () => new Promise(resolve => setImmediate(resolve))
 const response = body => ({ status: 200, text: async () => JSON.stringify(body) })
 
@@ -431,7 +437,7 @@ test('OpenCode login completion and failures are visible in the plugin detail pa
     ? { loggedIn: true, login: { status: 'ok' } } : { loggedIn: true, login: { status: 'error', detail: '授权已过期' } }) })
   ui.render(); ui.effects[2](); await tick()
   let card = elements(ui.render()).find(node => node.props?.['data-opencode-login'])
-  assert.ok(elements(card).some(node => node.children.includes('重新登录 OpenCode Console')))
+  assert.ok(elements(card).some(node => node.children.includes('重新登录')))
   elements(card).find(node => node.type === 'button').props.onClick(); await tick()
   card = elements(ui.render()).find(node => node.props?.['data-opencode-login'])
   assert.ok(elements(card).some(node => node.children.includes('授权已过期')))
@@ -469,7 +475,7 @@ test('waiting login supports callback paste and cancellation in the plugin page'
 test('signed-in state offers re-login and cancellation failures are visible', async () => {
   const signedIn = loadClient({ status: { loggedIn: true, login: null } })
   const button = elements(signedIn.render()).find(node => node.type === 'button')
-  assert.ok(button.children.includes('重新登录 ChatGPT'))
+  assert.ok(button.children.includes('重新登录'))
   const ui = loadClient({
     status: { loggedIn: false, login: { status: 'waiting' } },
     fetchImpl: async () => { throw new Error('network unavailable') },
@@ -522,22 +528,22 @@ test('account page queries only configured subscriptions and refreshes their rem
   cleanup()
 })
 
-test('account page excludes DeepSeek, deduplicates subscriptions and displays at most three', async () => {
+test('account page keeps the original subscriptions plus OpenDesign and displays at most four', async () => {
   const calls = []
   const ui = loadClient({ fetchImpl: async url => {
     calls.push(url)
     return response(url.endsWith('/subscriptions') ? { subscriptions: [
       { providerId: 'deepseek' }, { providerId: 'deepseek-official' },
       { providerId: 'openai-codex' }, { providerId: 'openai-codex' },
-      { providerId: 'opencode-go' }, { providerId: 'fixture-third' }, { providerId: 'fixture-fourth' },
+      { providerId: 'opencode-go' }, { providerId: 'opencode' }, { providerId: 'opendesign' }, { providerId: 'fixture-fifth' },
     ] } : { status: 'unknown', windows: [] })
   } })
   ui.renderBalances()
   ui.effects[0]()
   await tick()
   const cards = elements(ui.renderBalances()).filter(node => node.props?.['data-subscription'])
-  assert.deepEqual(cards.map(node => node.props['data-subscription']), ['openai-codex', 'opencode-go', 'fixture-third'])
-  assert.equal(calls.length, 4, 'one list request and at most three usage requests')
+  assert.deepEqual(cards.map(node => node.props['data-subscription']), ['openai-codex', 'opencode-go', 'opencode', 'opendesign'])
+  assert.equal(calls.length, 5, 'one list request and at most four usage requests')
 })
 
 test('an account without subscriptions renders no quota cards or usage requests', async () => {
@@ -882,4 +888,455 @@ test('unavailable persistent storage remains an explicit non-blocking error', as
   assert.ok(nodes.some(node => node.children.includes('剩余 60%')))
   assert.ok(nodes.some(node => node.children.includes('本地额度缓存保存失败，退出后可能无法保留')))
   assert.ok(ui.warnings.some(message => message.includes('cache write failed')))
+})
+
+test('signed out, both sign-in paths are offered and only one is expanded', async () => {
+  const calls = []
+  const ui = loadClient({ fetchImpl: async (url, init) => { calls.push([url, init]); return response({ loggedIn: false, mode: null, models: { state: 'idle', protocol: 'chat-completions' } }) } })
+  const tree = ui.render()
+  const nodes = elements(tree)
+  const label = node => node.props?.children ?? node.children?.[0]
+  assert.ok(nodes.some(node => node.props?.['data-opendesign-login']))
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '使用 OpenDesign 账号授权'), 'account path offered')
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '使用 API Key'), 'key path offered')
+  assert.equal(nodes.some(node => node.type === 'input' && node.props?.['aria-label'] === 'OpenDesign API Key'), false,
+    'the key field stays collapsed until that path is chosen')
+  const cleanups = ui.effects.slice().map(effect => effect()).filter(value => typeof value === 'function')
+  await tick()
+  assert.ok(calls.some(([url]) => url.endsWith('/opendesign/status')))
+  assert.ok(calls.some(([url]) => url.endsWith('/opencode/status')))
+  assert.ok(calls.some(([url]) => url === '/dsh-opencode-live-models/status'))
+  for (const cleanup of cleanups) cleanup()
+  ui.dispose()
+})
+
+test('the manual key field is offered only while signed out', async () => {
+  const calls = []
+  let mode = null
+  const ui = loadClient({ fetchImpl: async (url, init) => {
+    calls.push([url, init])
+    if (url.endsWith('/opendesign/key')) { mode = 'api-key'
+      return response({ loggedIn: true, mode: 'api-key', models: { modelCount: 2, protocol: 'responses', state: 'ready' } }) }
+    if (url.endsWith('/opendesign/status')) return response(mode === null ? { loggedIn: false } : { loggedIn: true, mode, models: { modelCount: 2, protocol: 'responses', state: 'ready' } })
+    return response({ loggedIn: false })
+  } })
+  const keyField = tree => elements(tree).some(node => node.type === 'input' && node.props['aria-label'] === 'OpenDesign API Key')
+  const label = node => node.props?.children ?? node.children?.[0]
+  let tree = ui.render()
+  assert.equal(keyField(tree), false, 'the field is hidden until the key path is chosen')
+  elements(tree).find(node => node.type === 'button' && label(node) === '使用 API Key').props.onClick()
+  tree = ui.render()
+  assert.equal(keyField(tree), true, 'choosing the key path reveals it')
+  assert.equal(elements(tree).some(node => node.type === 'button' && label(node) === '使用 OpenDesign 账号授权'), false,
+    'the other path is withdrawn')
+  elements(tree).find(node => node.type === 'input' && node.props['aria-label'] === 'OpenDesign API Key').props.onChange({ target: { value: 'sk-amr-client-fixture' } })
+  tree = ui.render()
+  elements(tree).find(node => node.type === 'button' && node.children.includes('保存 OpenDesign API Key')).props.onClick()
+  await tick(); await tick()
+  const post = calls.find(([url]) => url.endsWith('/opendesign/key'))
+  assert.equal(JSON.parse(post[1].body).apiKey, 'sk-amr-client-fixture')
+  assert.equal(post[1].headers['content-type'], 'application/json')
+  tree = ui.render()
+  assert.equal(keyField(tree), false, 'signed in: no redundant key field')
+  assert.ok(!JSON.stringify(tree).includes('sk-amr-client-fixture'))
+  assert.ok(elements(tree).some(node => node.type === 'button' && (node.props?.children ?? node.children?.[0]) === '退出登录'),
+    'the signed-in card still offers logout instead of a key field')
+  ui.dispose()
+})
+
+test('OpenDesign account login renders only the official activation link and cancellation control', async () => {
+  const calls = []
+  const ui = loadClient({ fetchImpl: async (url, init) => {
+    calls.push([url, init])
+    return response({ loggedIn: false, login: { status: 'waiting', userCode: 'OD-CODE', openUrl: 'https://open-design.ai/cloud/cli/activate?code=example' } })
+  } })
+  elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用 OpenDesign 账号授权')).props.onClick()
+  await tick()
+  const nodes = elements(ui.render())
+  assert.equal(calls[0][0], '/dsh-opencode-live-models/opendesign/login')
+  assert.ok(nodes.some(node => node.type === 'strong' && node.children.includes('OD-CODE')))
+  const link = nodes.find(node => node.type === 'a' && node.props.href?.startsWith('https://open-design.ai/cloud/cli/activate'))
+  assert.ok(link)
+  assert.equal(link.props.rel, 'noopener noreferrer')
+  nodes.find(node => node.type === 'button' && node.children.includes('取消 OpenDesign 登录')).props.onClick()
+  await tick()
+  assert.equal(calls.at(-1)[0], '/dsh-opencode-live-models/opendesign/cancel')
+  ui.dispose()
+})
+
+test('OpenDesign subscription shows both windows and wallet without dropping Codex or Zen', async () => {
+  const subscriptions = [
+    { providerId: 'openai-codex', cacheKey: 'codex-fixture' }, { providerId: 'opencode-go', cacheKey: 'go-fixture' },
+    { providerId: 'opencode', cacheKey: 'zen-fixture', kind: 'balance' }, { providerId: 'opendesign', label: 'OpenDesign', cacheKey: 'od-fixture' },
+  ]
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions') ? { subscriptions } : url.includes('provider=opendesign')
+    ? { status: 'ready', plan: 'Design Plan Go', warning: '套餐补充接口暂不可用', balance: { amount: 2.5, currency: 'USD' }, windows: [{ id: 'window-18000-0', label: '5 hours', remainingPercent: 65 }] }
+    : url.includes('provider=opencode&') || url.endsWith('provider=opencode') ? { status: 'ready', balance: { amount: 1, currency: 'USD' }, windows: [] }
+    : { status: 'ready', windows: [{ id: 'weekly', remainingPercent: 90 }] }) })
+  ui.renderBalances(); ui.effects[0]()
+  await tick()
+  const tree = ui.renderBalances(), nodes = elements(tree)
+  for (const id of subscriptions.map(value => value.providerId)) assert.ok(nodes.some(node => (node.props?.['data-subscription'] ?? node.props?.['data-balance']) === id), id)
+  const card = nodes.find(node => node.props?.['data-subscription'] === 'opendesign')
+  assert.ok(elements(card).some(node => node.children.includes('剩余 65%')))
+  assert.ok(elements(card).some(node => node.children.some(value => typeof value === 'string' && value.includes('钱包余额：'))))
+  assert.ok(elements(card).some(node => node.children.includes('套餐补充接口暂不可用')))
+  const cached = JSON.parse(ui.storage.getItem(STORAGE_KEY)).entries.find(value => value.provider.providerId === 'opendesign')
+  assert.equal(cached.snapshot.plan, 'Design Plan Go')
+  assert.equal(cached.snapshot.warning, '套餐补充接口暂不可用')
+  ui.dispose()
+})
+
+
+test('OpenDesign models appear in the unified catalog, not its own card', async () => {
+  const calls = []
+  const ui = loadClient({ fetchImpl: async url => {
+    calls.push(url)
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opencode-go', label: 'OpenCode Go', group: 'opencode', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
+      { id: 'opendesign', label: 'OpenDesign', group: 'opendesign', models: [{ id: 'od-one', name: 'OD One', enabled: true }] },
+    ] })
+    if (url.endsWith('/opendesign/status')) return response({ loggedIn: true, mode: 'account', models: { modelCount: 1, state: 'ready' } })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = expandAll(ui)
+  assert.equal(nodes.some(node => node.props?.['data-opendesign-catalog']), false, 'the card no longer carries its own list')
+  assert.ok(nodes.some(node => node.props?.['data-provider-group'] === 'opendesign'), 'OpenDesign gets a unified group')
+  assert.ok(nodes.some(node => node.props?.['data-route-model'] === 'od-one'), 'its models render there')
+  ui.dispose()
+})
+
+
+test('checkbox edits stay local until Save posts the changed route once', async () => {
+  const calls = []
+  let enabled = new Set(['od-one'])
+  const ui = loadClient({ fetchImpl: async (url, init) => {
+    calls.push([url, init])
+    if (url.endsWith('/opendesign/routes/enabled')) {
+      enabled = new Set(JSON.parse(init.body).enabledModels)
+      return response({ ok: true })
+    }
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opendesign', label: 'OpenDesign', group: 'opendesign', models: [
+        { id: 'od-one', name: 'One', contextWindow: 1000, enabled: enabled.has('od-one') },
+        { id: 'od-two', name: 'Two', contextWindow: 1000, enabled: enabled.has('od-two') },
+      ] },
+    ] })
+    if (url.endsWith('/opendesign/status')) return response({ loggedIn: true, mode: 'account', models: { modelCount: 2, state: 'ready' } })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const before = calls.length
+  let nodes = expandAll(ui)
+  const boxes = nodes.filter(node => node.type === 'input' && node.props?.type === 'checkbox')
+  assert.equal(boxes.length, 2)
+  assert.equal(boxes[0].props.checked, true)
+  assert.equal(boxes[1].props.checked, false)
+
+  boxes[1].props.onChange({ target: { checked: true } })
+  await tick()
+  nodes = elements(ui.render())
+  const afterTick = nodes.filter(node => node.type === 'input' && node.props?.type === 'checkbox')
+  assert.equal(afterTick[1].props.checked, true, 'the draft shows the new state immediately')
+  assert.equal(calls.length, before, 'no request per click')
+  const label = node => node.props?.children ?? node.children?.[0]
+  const save = nodes.find(node => node.type === 'button' && label(node) === '保存选择')
+  assert.ok(save, 'save appears once the draft differs')
+
+  save.props.onClick()
+  await tick(); await tick()
+  const posts = calls.filter(([url]) => url.endsWith('/opendesign/routes/enabled'))
+  assert.equal(posts.length, 1, 'exactly one save request')
+  assert.deepEqual(JSON.parse(posts[0][1].body), { provider: 'opendesign', enabledModels: ['od-one', 'od-two'] })
+  ui.dispose()
+})
+
+test('toggling all edits the draft without hitting the server', async () => {
+  const calls = []
+  const ui = loadClient({ fetchImpl: async url => {
+    calls.push(url)
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opendesign', label: 'OpenDesign', group: 'opendesign', models: [
+        { id: 'od-one', name: 'One', enabled: true }, { id: 'od-two', name: 'Two', enabled: true },
+      ] },
+    ] })
+    if (url.endsWith('/opendesign/status')) return response({ loggedIn: true, mode: 'account', models: { modelCount: 2, state: 'ready' } })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const before = calls.length
+  const label = node => node.props?.children ?? node.children?.[0]
+  const all = expandAll(ui).find(node => node.type === 'button' && label(node) === '全部关闭')
+  all.props.onClick({ preventDefault() {} })
+  await tick()
+  const nodes = elements(ui.render())
+  assert.ok(!calls.slice(before).some(url => String(url).endsWith('/opendesign/routes/enabled')), 'batch toggle stays local')
+  assert.ok(nodes.every(node => node.props?.type !== 'checkbox' || node.props.checked === false), 'every box clears')
+  assert.ok(nodes.some(node => (node.props?.children ?? node.children?.[0]) === '保存选择'))
+  ui.dispose()
+})
+
+test('each model draws an iOS-style switch with a hidden native box', async () => {
+  const ui = loadClient({ fetchImpl: async url => {
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opendesign', label: 'OpenDesign', group: 'opendesign', models: [
+        { id: 'od-one', name: 'One', enabled: true }, { id: 'od-two', name: 'Two', enabled: false },
+      ] },
+    ] })
+    if (url.endsWith('/opendesign/status')) return response({ loggedIn: true, mode: 'account', models: { modelCount: 2, state: 'ready' } })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = expandAll(ui)
+  const boxes = nodes.filter(node => node.type === 'input' && node.props?.type === 'checkbox')
+  assert.equal(boxes.length, 2)
+  assert.equal(boxes[0].props.style.opacity, 0, 'the native box is hidden behind the drawn switch')
+  assert.match(boxes[0].props['aria-label'], /启用/)
+  const tracks = nodes.filter(node => node.type === 'span' && node.props?.['aria-hidden'] === 'true')
+  assert.equal(tracks.length, 4, 'each model draws a track and a knob')
+  ui.dispose()
+})
+
+
+test('cancelling a chosen path restores both sign-in options', async () => {
+  const ui = loadClient({ fetchImpl: async () => response({ loggedIn: false, mode: null, models: { state: 'idle' } }) })
+  const label = node => node.props?.children ?? node.children?.[0]
+  let nodes = elements(ui.render())
+  nodes.find(node => node.type === 'button' && label(node) === '使用 API Key').props.onClick()
+  nodes = elements(ui.render())
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '取消'), 'the key path can be cancelled')
+  nodes.find(node => node.type === 'button' && label(node) === '取消').props.onClick()
+  nodes = elements(ui.render())
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '使用 OpenDesign 账号授权'))
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '使用 API Key'))
+  ui.dispose()
+})
+
+test('starting the account path hides the key path until it is cancelled', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/login')
+    ? { loggedIn: false, login: { status: 'waiting', userCode: 'OD-CODE' }, models: { state: 'idle' } }
+    : { loggedIn: false, mode: null, models: { state: 'idle' } }) })
+  const label = node => node.props?.children ?? node.children?.[0]
+  let nodes = elements(ui.render())
+  nodes.find(node => node.type === 'button' && label(node) === '使用 API Key')
+  nodes.find(node => node.type === 'button' && label(node) === '使用 OpenDesign 账号授权').props.onClick()
+  await tick(); await tick()
+  nodes = elements(ui.render())
+  assert.equal(nodes.some(node => node.type === 'button' && label(node) === '使用 API Key'), false, 'key path withdrawn')
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '取消 OpenDesign 登录'))
+  nodes.find(node => node.type === 'button' && label(node) === '取消 OpenDesign 登录').props.onClick()
+  await tick(); await tick()
+  nodes = elements(ui.render())
+  assert.ok(nodes.some(node => node.type === 'button' && label(node) === '使用 API Key'), 'key path is back after cancel')
+  ui.dispose()
+})
+
+
+test('the route model section renders one switch per model and saves once', async () => {
+  const calls = []
+  const ui = loadClient({ fetchImpl: async (url, init) => {
+    calls.push([url, init])
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opencode-go', label: 'OpenCode Go', models: [
+        { id: 'go-a', name: 'Go A', contextWindow: 1000, enabled: true },
+        { id: 'go-b', name: 'Go B', contextWindow: 2000, enabled: false },
+      ] },
+      { id: 'opencode', label: 'OpenCode Zen', models: [{ id: 'zen-a', name: 'Zen A', enabled: true }] },
+    ] })
+    if (url.endsWith('/opendesign/routes/enabled')) return response({ ok: true })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = expandAll(ui)
+  assert.ok(nodes.some(node => node.props?.['data-route-models']), 'section renders')
+  const boxes = nodes.filter(node => node.type === 'input' && node.props?.type === 'checkbox')
+  assert.equal(boxes.length, 3, 'one switch per model across both routes')
+  assert.equal(boxes[0].props.checked, true)
+  assert.equal(boxes[1].props.checked, false)
+
+  const before = calls.length
+  boxes[1].props.onChange({ target: { checked: true } })
+  await tick()
+  assert.equal(calls.length, before, 'a click stays local')
+
+  const label = node => node.props?.children ?? node.children?.[0]
+  const save = elements(ui.render()).find(node => node.type === 'button' && label(node) === '保存选择')
+  assert.ok(save, 'save appears once the draft differs')
+  save.props.onClick()
+  await tick(); await tick()
+  const posts = calls.filter(([url]) => url.endsWith('/opendesign/routes/enabled'))
+  assert.equal(posts.length, 1, 'only the changed route is posted')
+  assert.equal(JSON.parse(posts[0][1].body).provider, 'opencode-go')
+  ui.dispose()
+})
+
+test('an empty catalog explains what to do instead of rendering nothing', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/routes') ? { routes: [
+    { id: 'opencode-go', label: 'OpenCode Go', models: [] },
+    { id: 'opencode', label: 'OpenCode Zen', models: [] },
+  ] } : { loggedIn: false }) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = elements(ui.render())
+  const section = nodes.find(node => node.props?.['data-route-models'])
+  assert.ok(section, 'the section still renders')
+  assert.ok(elements(section).some(node => node.type === 'p'), 'with an explanation')
+  ui.dispose()
+})
+
+
+test('OpenCode GO and Zen share one card as two stacked channels', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/routes') ? { routes: [
+    { id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
+    { id: 'opencode', label: 'OpenCode Zen', models: [{ id: 'zen-a', name: 'Zen A', enabled: true }] },
+    { id: 'openai-codex', label: 'OpenAI Codex', models: [{ id: 'cx-a', name: 'CX A', enabled: true }] },
+  ] } : { loggedIn: false }) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = expandAll(ui)
+  const groups = nodes.filter(node => node.props?.['data-provider-group'])
+  assert.deepEqual(groups.map(node => node.props['data-provider-group']), ['opencode', 'openai-codex'])
+  const opencode = groups[0]
+  const channels = elements(opencode).filter(node => node.props?.['data-route'])
+  assert.deepEqual(channels.map(node => node.props['data-route']), ['opencode-go', 'opencode'], 'both channels stack inside one card')
+  ui.dispose()
+})
+
+
+test('the plugin page asks for the catalog on the OpenDesign-prefixed route', async () => {
+  // Regression: the client once requested /routes, which the server never mounts,
+  // so the whole card silently never rendered.
+  const requested = []
+  const ui = loadClient({ fetchImpl: async url => {
+    requested.push(url)
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
+    ] })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  assert.ok(requested.includes('/dsh-opencode-live-models/opendesign/routes'), 'the mounted path is used')
+  const nodes = elements(ui.render())
+  assert.ok(nodes.some(node => node.props?.['data-provider-group'] === 'opencode'))
+  ui.dispose()
+})
+
+
+test('each provider group carries its display name in the expected case', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/routes') ? { routes: [
+    { id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
+    { id: 'opencode', label: 'OpenCode Zen', models: [{ id: 'zen-a', name: 'Zen A', enabled: true }] },
+    { id: 'openai-codex', label: 'OpenAI Codex', models: [{ id: 'cx-a', name: 'CX A', enabled: true }] },
+    { id: 'opendesign', label: 'OpenDesign', models: [{ id: 'od-a', name: 'OD A', enabled: true }] },
+  ] } : { loggedIn: false }) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const text = node => typeof node.props?.children === 'string' ? node.props.children : (node.children ?? []).filter(v => typeof v === 'string').join('')
+  const groups = expandAll(ui).filter(node => node.props?.['data-provider-group'])
+  const titles = groups.map(group => elements(group).map(text).find(value => ['OpenCode', 'OpenAI', 'OpenDesign'].includes(value)))
+  assert.deepEqual(titles, ['OpenCode', 'OpenAI', 'OpenDesign'])
+  const channelLabels = elements(groups[0]).map(text).filter(value => value === 'OpenCode Go' || value === 'OpenCode Zen')
+  assert.deepEqual(channelLabels, ['OpenCode Go', 'OpenCode Zen'], 'both channels keep their own case')
+  ui.dispose()
+})
+
+
+test('a channel starts collapsed, expands without saving, and collapses back', async () => {
+  const calls = []
+  const ui = loadClient({ fetchImpl: async url => {
+    calls.push(url)
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
+    ] })
+    return response({ loggedIn: false })
+  } })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const label = node => node.props?.children ?? node.children?.[0]
+  let nodes = expandAll(ui)
+  nodes.find(node => node.props?.['data-toggle-route']).props.onClick({ preventDefault() {} })
+  nodes = elements(ui.render())
+  assert.equal(nodes.some(node => node.props?.['data-route-model']), false, 'channel collapsed by default')
+  const before = calls.length
+
+  nodes.find(node => node.props?.['data-toggle-route'] === 'opencode-go').props.onClick({ preventDefault() {} })
+  nodes = elements(ui.render())
+  assert.ok(nodes.some(node => node.props?.['data-route-model'] === 'go-a'), 'expanded shows the models')
+  assert.equal(calls.length, before, 'expanding issues no request')
+  assert.ok(nodes.some(node => label(node) === '收起'), 'the same control now offers collapse')
+
+  nodes.find(node => node.props?.['data-toggle-route'] === 'opencode-go').props.onClick({ preventDefault() {} })
+  nodes = elements(ui.render())
+  assert.equal(nodes.some(node => node.props?.['data-route-model']), false, 'collapsed again')
+  assert.equal(calls.length, before, 'collapsing saves nothing')
+  assert.ok(nodes.some(node => label(node) === '展开'))
+  ui.dispose()
+})
+
+
+test('the provider group header toggles between 展开 and 收起', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/routes') ? { routes: [
+    { id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
+  ] } : { loggedIn: false }) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const label = node => node.props?.children ?? node.children?.[0]
+  let nodes = elements(ui.render())
+  const toggle = () => nodes.find(node => node.props?.['data-toggle-group'] === 'opencode')
+  assert.equal(label(toggle()), '展开', 'starts collapsed')
+  assert.equal(nodes.some(node => node.props?.['data-toggle-route']), false, 'channels hidden while collapsed')
+
+  toggle().props.onClick({ preventDefault() {} })
+  nodes = elements(ui.render())
+  assert.equal(label(toggle()), '收起', 'the label follows the state')
+  assert.ok(nodes.some(node => node.props?.['data-toggle-route'] === 'opencode-go'), 'channels appear')
+
+  toggle().props.onClick({ preventDefault() {} })
+  nodes = elements(ui.render())
+  assert.equal(label(toggle()), '展开', 'collapses back')
+  ui.dispose()
+})
+
+
+test('the signed-in OpenDesign card mirrors the other two sign-in cards', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/status')
+    ? { loggedIn: true, mode: 'account', models: { modelCount: 11, state: 'ready', protocol: 'chat-completions' } }
+    : { loggedIn: false }) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = elements(ui.render())
+  const card = nodes.find(node => node.props?.['data-opendesign-login'])
+  assert.ok(card, 'card renders')
+  const label = node => node.props?.children ?? node.children?.[0]
+  const buttons = elements(card).filter(node => node.type === 'button').map(label)
+  assert.deepEqual(buttons, ['重新登录', '退出登录'], 'one primary action plus logout')
+  const text = JSON.stringify(elements(card).map(node => [node.props?.children, node.children]))
+  assert.ok(!text.includes('当前协议'), 'the protocol line moved out of the card')
+  assert.ok(!text.includes('额度与钱包余额可在'), 'the quota hint moved out of the card')
+  assert.ok(!text.includes('刷新模型目录'), 'model refresh lives in the unified catalog')
+  ui.dispose()
+})
+
+test('every sign-in card offers exactly re-login and logout when signed in', async () => {
+  const signedIn = { loggedIn: true, mode: 'account', models: { modelCount: 3, state: 'ready', protocol: 'chat-completions' } }
+  const ui = loadClient({ fetchImpl: async () => response(signedIn) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const label = node => node.props?.children ?? node.children?.[0]
+  const buttons = elements(ui.render()).filter(node => node.type === 'button').map(label)
+  // Three cards, one pair each. Counting the pairs avoids depending on how the
+  // rendered tree nests them.
+  assert.equal(buttons.filter(text => text === '重新登录').length, 3, 'one re-login per card')
+  assert.equal(buttons.filter(text => text === '退出登录').length, 3, 'one logout per card')
+  const text = JSON.stringify(elements(ui.render()).map(node => [node.props?.children, node.children]))
+  for (const forbidden of ['当前协议', '已发现', '额度与钱包余额可在', '清除 OpenDesign 登录', '重新登录 OpenDesign']) {
+    assert.ok(!text.includes(forbidden), 'no card carries ' + forbidden)
+  }
+  ui.dispose()
+})
+
+test('API-key-only OpenDesign quota is unsupported, not zero or a lost model login', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'opendesign', cacheKey: 'od-key-fixture' }] }
+    : { status: 'unsupported', windows: [] }) })
+  ui.renderBalances(); ui.effects[0]()
+  await tick()
+  const nodes = elements(ui.renderBalances())
+  assert.ok(nodes.some(node => node.children.includes('API Key 可用于模型调用；套餐额度查询需要 OpenDesign 账号授权。')))
+  assert.ok(!nodes.some(node => node.children.includes('剩余 0%') || node.children.includes('登录已失效')))
+  ui.dispose()
 })

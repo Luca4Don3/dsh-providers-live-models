@@ -48,11 +48,30 @@ dsh plugin --profile desktop add github:Luca4Don3/dsh-opencode-live-models
 
 > **0.1.1 仅作版本记录保留，请勿安装。** 其中两个缺陷已在 0.1.2 修复：adapter 注册前到达的名单可能绕过规模校验而隐藏已安装模型；卸载后叠加层不会被撤除，插件已不再维护，选择器却仍显示那些模型。原地升级即可，无需先移除现有安装。
 
+## OpenDesign（0.12.0-rc.1 预发布）
+
+插件详情新增「OpenDesign Cloud」卡片，支持手动 API Key 与设备账号授权。新增 provider 为 `opendesign`，按当前账号从模型接口获取目录，不把静态 Go 名单当成所有账号的权限。默认采用参考 DSH 插件的 Chat Completions，也可显式选择 Responses；原 OpenCode 的逐模型协议和原生 Codex Responses 不变。
+
+API Key 模式仅调用模型；账号授权模式额外读取额度与钱包。额度补充接口失败时保留已获得的窗口，缺失余额显示未知，不伪造为零。密钥只保存在本插件独立 grant，不回显，不写浏览器缓存；不读取 OpenDesign 桌面端凭据、不运行 `vela`、不扫描会话历史。
+
+```yaml
+config:
+  openDesign:
+    enabled: true
+    protocol: chat-completions # 也可使用 responses
+    outputTokenBudget: 8192    # 本地单次输出预算，不是供应商能力上限
+    stripTemperature: false    # 仅对 OpenDesign 请求移除 temperature
+    quotaSource: auto          # auto | vela | control
+```
+
+`stripTemperature` 默认关闭。开启后只从发往 OpenDesign 的请求体中删除 `temperature`，其他字段不动；用于网关拒绝该字段时。自动审查预设的 reviewer 固定发送 `temperature: 0`，把会话切到 OpenDesign 模型后可能因此报错，此时开启该开关即可，不必修改审查插件，也不影响其他供应商。代价是 OpenDesign 请求里显式设置的温度同样会被丢弃。
+
+当前桥接明确校验 DSH 0.2.1-rc.2 与其同源 pi-ai 1.1.0，不新增或升级 pi-ai 依赖。宿主不匹配时仅 OpenDesign 报不可用，旧提供方不受影响。新登录接口目前限本机同源 GUI。实现与未完成的验证见 [OpenDesign 接入说明](docs/opendesign.md)。
 ## 登录和订阅额度
 
 打开侧栏「插件」→「dsh-opencode-live-models」，详情页提供「使用 ChatGPT 账号登录」、重新登录、授权状态、回调地址粘贴与取消操作。
 
-打开「设置 → 账号与余额」，官方 DeepSeek 余额下方会自动显示已登录／已配置凭据的订阅，最多同时显示 3 个供应商，不重复显示 DeepSeek 官方余额。优先显示 OpenAI订阅和 OpenCode Go 的百分比额度卡片，OpenCode Zen 等金额余额以整行长框放在最下方。进入页面时查询，也可点击刷新。订阅卡片显示剩余额度百分比与重置时间，不换算为现金金额；缺失数据保持未知，过期数据保留原查询时间。额度查询与模型目录的后台刷新相互独立。
+打开「设置 → 账号与余额」，官方 DeepSeek 余额下方会自动显示已登录／已配置凭据的订阅，最多同时显示 4 个供应商，不重复显示 DeepSeek 官方余额。优先显示 OpenAI订阅和 OpenCode Go 的百分比额度卡片，OpenCode Zen 等金额余额以整行长框放在最下方。进入页面时查询，也可点击刷新。订阅卡片显示剩余额度百分比与重置时间，不换算为现金金额；缺失数据保持未知，过期数据保留原查询时间。额度查询与模型目录的后台刷新相互独立。
 
 账号页会将成功查询的额度卡片保存到本地显示缓存，`Command+Q` 完全退出 DSH 后仍保留。重新启动或打开设置时立即显示上次结果，同时后台核对本机凭据状态；重新启动后的首次进入会后台查询最新额度，查询期间保留缓存，只有没有缓存时才显示「正在查询额度」。运行期间缓存的新鲜度由 `freshMs` 决定（默认 5 分钟），过期结果也先显示再更新，各张卡片独立完成。核对或查询失败时保留旧结果及原查询时间；确认退出登录或切换账号／Go key 后移除对应旧缓存。点击「刷新额度」会强制重新查询。本地存储不可用时会明确提示，在线查询仍可继续。
 
