@@ -8,5 +8,5 @@
 # module must also load in a bare Node process for its test suite, where it
 # cannot. See the module header.
 - insert:
-    - id: opencode-live-models
+    - id: providers-live-models
       name: dsh-providers-live-models
