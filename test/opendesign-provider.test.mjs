@@ -250,15 +250,15 @@ test('duplicate registration cannot displace an existing provider', async () => 
   assert.equal(f.routes.get('opendesign'), f.adapter); f.api.dispose()
 })
 
-function loaderFixture({ shared = false, piVersion = '1.1.0', protocol = 'chat-completions', manifest = true } = {}) {
+function loaderFixture({ shared = false, piVersion = '1.1.0', protocol = 'chat-completions', manifest = true, hostVersion = '0.2.1-rc.2' } = {}) {
   const parent = 'file:///host/adapter/lib/index.js', imports = [], resolutions = []
   const exportsMap = { './api/*': { import: './dist/api/*.js' } }
   const packages = { resolution: { entries: [{ name: '@deepseek-ai/dsh-llm-pi-ai', scope: 'installation', packageDir: '/host/adapter' }] },
     packageOf(name, importer) {
-      if (name === '@deepseek-ai/dsh-llm-pi-ai') return { dir: '/host/adapter', version: '0.2.1-rc.2' }
+      if (name === '@deepseek-ai/dsh-llm-pi-ai') return { dir: '/host/adapter', version: hostVersion }
       if (name === '@earendil-works/pi-ai') return { dir: importer === parent || shared ? '/host/pi' : '/profile/pi', version: piVersion,
         ...(manifest ? { manifest: { exports: exportsMap } } : {}) }
-      if (name === '@deepseek-ai/dsh-llm') return { dir: '/host/llm', version: '0.2.1-rc.2', manifest: { exports: { '.': { import: './lib/index.js' } } } }
+      if (name === '@deepseek-ai/dsh-llm') return { dir: '/host/llm', version: hostVersion, manifest: { exports: { '.': { import: './lib/index.js' } } } }
     } }
   // The manifest path is exercised by its own unit suite; here it stands in for
   // the file a loader would pick, so the bridge's choice of copy is observable.
@@ -331,4 +331,16 @@ test('a pi-ai version the bridge was not written for is rejected before any impo
   const newer = loaderFixture({ piVersion: '1.3.0' })
   await assert.rejects(loadOpenDesignHost(newer.ctx, newer.seams), { code: 'unsupported-host' })
   assert.equal(newer.imports.length, 0)
+})
+
+test('a host patch release stays on the compatibility line instead of dead-ending', async () => {
+  // Regression: the gate compared version strings for equality, so upgrading DSH
+  // from rc.2 to rc.3 dropped the whole OpenDesign route without an explanation.
+  const upgraded = loaderFixture({ hostVersion: '0.2.1-rc.3' })
+  const host = await loadOpenDesignHost(upgraded.ctx, upgraded.seams)
+  assert.equal(host.hostVersion, '0.2.1-rc.3', 'a patch release still resolves')
+
+  const moved = loaderFixture({ hostVersion: '0.3.0' })
+  await assert.rejects(() => loadOpenDesignHost(moved.ctx, moved.seams), /verified host pi-ai adapter/,
+    'a major.minor change still fails closed')
 })
