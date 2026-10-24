@@ -111,3 +111,45 @@ test('Zen unavailable or malformed money stays unknown rather than zero', () => 
 test('Zen invoiced available credit is identified separately from prepaid cash', () => {
   assert.deepEqual(normalizeOpenCodeZen({ availableMicroCents: '2500000000', mode: 'invoiceable' }).balance, { amount: 25, currency: 'USD', kind: 'credit' })
 })
+
+test('OpenRouter reports a key cap as credits, never as a percentage window', async () => {
+  const { normalizeOpenRouterKey } = await import('../../lib/subscription/normalize.js')
+  const snap = normalizeOpenRouterKey({ data: { usage: 25.75, limit: 100.5, limit_remaining: 74.75, is_free_tier: false } }, { capturedAt: 1 })
+  assert.equal(snap.providerId, 'openrouter')
+  assert.equal(snap.status, 'ready')
+  assert.deepEqual(snap.windows, [], 'a spend cap is money, not an allowance window')
+  assert.equal(snap.credits.used, 25.75)
+  assert.equal(snap.credits.balance, 74.75)
+  assert.equal(snap.credits.limit, 100.5)
+  assert.equal(snap.credits.currency, 'USD')
+})
+
+test('an OpenRouter key with nothing left reads exhausted rather than ready', async () => {
+  const { normalizeOpenRouterKey } = await import('../../lib/subscription/normalize.js')
+  const snap = normalizeOpenRouterKey({ data: { usage: 10, limit: 10, limit_remaining: 0 } }, { capturedAt: 1 })
+  assert.equal(snap.status, 'exhausted')
+  assert.equal(snap.credits.hasCredits, false)
+})
+
+test('Command Code keeps dollars and plan windows apart', async () => {
+  const { normalizeCommandCode } = await import('../../lib/subscription/normalize.js')
+  const snap = normalizeCommandCode({
+    credits: { credits: { planId: 'individual-goat-monthly', monthlyCredits: 41.2, purchasedCredits: 5, freeCredits: 0 },
+      windowLimits: { limited: true, fiveHour: { used: 3.1, cap: 10, resetAt: 1790000000000 },
+        weekly: { used: 12, cap: 40, resetAt: 1790400000000 } } },
+    plan: { planId: 'individual-goat-monthly', status: 'active' },
+  }, { capturedAt: 1 })
+  assert.equal(snap.providerId, 'commandcode')
+  assert.equal(snap.plan, 'GOAT', 'the plan id maps to its product name')
+  assert.equal(snap.credits.balance, 46.2, 'monthly, purchased and free add up')
+  assert.deepEqual(snap.windows.map(w => w.id), ['five-hour', 'weekly'])
+  assert.equal(snap.windows[0].usedPercent, 31)
+  assert.equal(snap.windows[0].display, '$3.10 / $10.00')
+})
+
+test('a Command Code plan with no windows yet is unknown, not empty', async () => {
+  const { normalizeCommandCode } = await import('../../lib/subscription/normalize.js')
+  const snap = normalizeCommandCode({ credits: { credits: {} }, plan: null }, { capturedAt: 1 })
+  assert.equal(snap.status, 'unknown')
+  assert.deepEqual(snap.windows, [])
+})

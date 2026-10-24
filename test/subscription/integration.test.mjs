@@ -98,7 +98,9 @@ test('display scopes survive subscription service restarts and change with the a
       describeRecord: async () => ({ configured: codex }),
       resolve: async name => {
         if (name === 'OPENCODE_API_KEY') return undefined
-        assert.equal(name, 'CUSTOM_GO_KEY')
+        // Other providers (OpenRouter, Command Code) resolve their own refs; this
+        // test only pins what the Go key reference must be.
+        if (name !== 'CUSTOM_GO_KEY') return undefined
         return go ? { value: goKey } : undefined
       },
       readRecord: async () => ({ ...record, payload: { ...record.payload, accountId } }),
@@ -198,7 +200,8 @@ test('unified entry mounts quota HTTP services under its own plugin lifetime', a
     },
   })
   await Promise.all(pending)
-  assert.deepEqual(services.get('subscriptionUsage').providers, ['openai-codex', 'opencode-go', 'opencode', 'opendesign'])
+  assert.deepEqual(services.get('subscriptionUsage').providers,
+    ['openai-codex', 'opencode-go', 'opencode', 'openrouter', 'commandcode', 'opendesign'])
   assert.equal(routes[0].path, '/dsh-providers-live-models')
   const body = await new Promise(resolve => routes[0].handler({ method: 'GET', url: routes[0].path + '/status', headers: {} }, { writeHead() {}, end: data => resolve(JSON.parse(data)) }))
   assert.equal(body.loggedIn, true)
