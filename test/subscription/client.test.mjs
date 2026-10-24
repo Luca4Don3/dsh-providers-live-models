@@ -401,14 +401,14 @@ test('plugin page reads status and its sign-in button starts the native login AP
   await tick()
   assert.equal(calls[0].url, '/dsh-providers-live-models/status')
   assert.equal(calls[0].init.headers['content-type'], undefined)
-  const button = elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用 ChatGPT 账号登录 / Sign in with ChatGPT'))
+  const button = elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用账号登录'))
   assert.ok(button)
   button.props.onClick()
   await tick()
   assert.equal(calls[1].url, '/dsh-providers-live-models/login')
   assert.equal(calls[1].init.method, 'POST')
   assert.equal(calls[1].init.credentials, 'same-origin')
-  assert.ok(elements(ui.render()).some(node => node.type === 'button' && node.children.includes('取消登录 / Cancel')))
+  assert.ok(elements(ui.render()).some(node => node.type === 'button' && node.children.includes('取消登录')))
 })
 
 test('plugin detail includes OpenCode official login, its device code, authorization link and cancellation', async () => {
@@ -456,7 +456,7 @@ test('waiting login supports callback paste and cancellation in the plugin page'
   let nodes = elements(ui.render())
   nodes.find(node => node.type === 'input').props.onChange({ target: { value: 'http://localhost:1455/auth/callback?code=fixture' } })
   nodes = elements(ui.render())
-  const submit = nodes.find(node => node.type === 'button' && node.children.includes('提交 / Submit'))
+  const submit = nodes.find(node => node.type === 'button' && node.children.includes('提交'))
   assert.equal(submit.props.disabled, false)
   submit.props.onClick()
   await tick()
@@ -466,7 +466,7 @@ test('waiting login supports callback paste and cancellation in the plugin page'
     status: { loggedIn: false, login: { status: 'waiting' } },
     fetchImpl: async (url, init) => { calls.push({ url, init }); return response({ loggedIn: false, login: null }) },
   })
-  elements(cancelUi.render()).find(node => node.type === 'button' && node.children.includes('取消登录 / Cancel')).props.onClick()
+  elements(cancelUi.render()).find(node => node.type === 'button' && node.children.includes('取消登录')).props.onClick()
   await tick()
   assert.equal(calls.at(-1).url, '/dsh-providers-live-models/cancel')
   assert.equal(calls.at(-1).init.method, 'POST')

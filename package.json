@@ -1,6 +1,6 @@
 {
   "name": "dsh-providers-live-models",
-  "version": "0.12.0-rc.32",
+  "version": "0.12.0-rc.33",
   "description": "Live OpenCode and Codex catalogs, isolated OpenDesign sign-in, model routing and subscription balances",
   "license": "MIT",
   "type": "module",
