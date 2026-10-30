@@ -177,6 +177,23 @@ function modelPicker(initialModels = []) {
     async open() { button('fetchModels').props.onClick(); await tick() } }
 }
 
+test('a renamed host component leaves the native editor working and says why it is undecorated', () => {
+  // The host renamed its components: none of the four known names appear.
+  function RenamedModelsSurface(props) {
+    return ui.react.createElement('section', null, ui.react.createElement('p', null, props.t('fetchModels')))
+  }
+  const entry = { options: { id: 'models' }, component: props => ui.react.createElement(RenamedModelsSurface, props) }
+  const slots = createSlots([entry])
+  const ui = loadClient({ slots })
+  // The mount replaced the slot entry's component; render through the slot twice.
+  for (let pass = 0; pass < 2; pass += 1) {
+    slots.entries('settings.section')[0].component({ models: [], onChange() {}, operations: {}, probe: {}, t: key => key })
+  }
+  const lines = ui.warnings.filter(line => String(line).includes('model selection editor not attached'))
+  assert.equal(lines.length, 1, 'exactly one diagnostic, not one per render')
+  assert.match(String(lines[0]), /native editor still works/i, 'the message must not imply the page broke')
+})
+
 test('discovery checkboxes remove an existing Fable row and preserve other model overrides', async () => {
   const picker = modelPicker([{ id: 'fable' }, { id: 'sol', name: 'Custom Sol', maxTokens: 100 }])
   await picker.open()
