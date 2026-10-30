@@ -86,15 +86,16 @@ possible, and `grep -r "dsh-app-boot" lib/` should only ever match comments.
 
 `loadOpenDesignHost` gates on:
 
-- `@deepseek-ai/dsh-llm-pi-ai` **0.2.1-rc.2**, resolved from the host importer and
+- `@deepseek-ai/dsh-llm-pi-ai` on the **0.2.x** compatibility line, resolved from the host importer and
   required to be the installation copy;
-- `@earendil-works/pi-ai` **1.1.0**, located through the host package's own
+- `@earendil-works/pi-ai` on the explicitly verified **1.1.x or 1.3.x** lines, located through the host package's own
   `pluginPackages.packageOf()`. Its `exports` map is read straight from the parsed
   manifest, so the file a loader would pick is found **without importing
   `@deepseek-ai/dsh-app-boot`** — the launcher never enters this plugin's module
   graph, at startup or later;
 - a bare `import(specifier)` is used only when both sides provably resolve to the
-  same directory; a differing copy is refused instead of patched.
+  same directory; a differing profile copy is never patched; the host-owned file is resolved from its manifest instead.
+- actual `PiAiAdapter` methods (`listModels`, `resolveModel`, `prepareCall`, provider information/retry policy and image targeting) and both transport stream functions. A matching version with missing methods is still refused.
 
 Any mismatch disables OpenDesign alone. No pi-ai dependency is declared — note
 that this package previously carried `"@earendil-works/pi-ai": "*"` as an optional
@@ -102,9 +103,7 @@ peer, which let pnpm bind it to whatever copy the profile resolved (1.3.0 once
 another plugin hoisted one). That peer is gone; the plugin now consumes the
 host's copy exclusively.
 
-The resolved-profile object passed to `PiAiAdapter` is a version-bound shim for
-0.2.1-rc.2, because that release does not export a profile resolver. It is not a
-stable public API and must be re-reviewed on a DSH upgrade.
+The resolved-profile object passed to `PiAiAdapter` remains a version-bound shim, not a stable public API. It has been checked against DSH **0.2.1-rc.5 / patched pi-ai 1.1.0** and **0.2.2-alpha.2 / patched pi-ai 1.3.0**. Both Chat Completions and Responses pass real-package offline tests for text/tool-call streaming, cache usage, account isolation, cancellation, model visibility and disposal. The main catalog overlay also passes real `Models` snapshot/rebuild/unload tests. See [host compatibility](host-compatibility.md) for the exact verification scope.
 ## Choosing which models to offer
 
 The plugin page lists the roster with one checkbox per model. Only checked models

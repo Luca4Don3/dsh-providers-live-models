@@ -87,6 +87,20 @@ test('Responses is explicit and remote protocol hints never choose the wire API'
   assert.equal(normalize(payload, { protocol: 'responses' }).models[0].api, 'openai-responses')
   assert.throws(() => normalize(payload, { protocol: 'unknown' }), TypeError)
 })
+
+for (const protocol of ['chat-completions', 'responses']) {
+  test(protocol + ': only DeepSeek descriptors opt in to long prompt-cache retention', () => {
+    const ids = ['deepseek-v4.1-flash', 'deepseek-v4-pro', 'deepseek-v4-flash-vision-exp', 'glm-5.3-flash', 'unknown']
+    const { models } = normalize({ data: ids.map(id => ({ ...row(id), compat: { supportsLongCacheRetention: true } })) }, { protocol })
+    for (const model of models) {
+      if (model.id.startsWith('deepseek')) {
+        assert.equal(model.compat.supportsLongCacheRetention, true)
+        assert.equal(Object.isFrozen(model.compat), true)
+      } else assert.equal(model.compat, undefined, 'untrusted roster compat must not opt other models in')
+    }
+  })
+}
+
 test('invalid capacities, envelope and bounds fail explicitly', () => {
   for (const context of [0, -1, 0.5, '100', Infinity, Number.MAX_SAFE_INTEGER + 1]) {
     assert.throws(() => normalize({ data: [row('bad', { context_limit: context })] }), { code: 'incomplete-catalog' })

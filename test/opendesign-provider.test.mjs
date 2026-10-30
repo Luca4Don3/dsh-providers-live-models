@@ -68,7 +68,7 @@ test('factory is lazy and owns only its new route; host failure registers nothin
   assert.equal(f.routes.has('opendesign'), false)
   assert.equal(f.routes.size, 4)
   await assert.rejects(createOpenDesignProvider({ llm: { registerAdapter() { assert.fail('must gate first') } } }, {
-    auth: { resolveAuth() {} }, loadHost: async () => ({ ...host({}), piVersion: '1.3.0' }),
+    auth: { resolveAuth() {} }, loadHost: async () => ({ ...host({}), piVersion: '1.4.0' }),
   }), { code: 'unsupported-host' })
 })
 test('refresh failures and unload preserve all original routes including a synthetic WorkBuddy adapter', async () => {
@@ -182,6 +182,47 @@ for (const selection of [undefined, 'responses']) {
     f.api.dispose()
   })
 }
+
+for (const protocol of ['chat-completions', 'responses']) {
+  test(protocol + ': the transport boundary defaults DeepSeek to long and preserves explicit transport options', async () => {
+    let config
+    const wire = []
+    class CapturingAdapter extends PiAiAdapter { constructor(value) { super(value); config = value } }
+    const capture = async function* (model, context, opts) { wire.push({ model, context, opts }); yield { type: 'text', text: 'ok' } }
+    const wireApi = { stream: capture, streamSimple: capture }
+    const f = await fixture({ protocol,
+      loadHost: async () => ({ ...host(wireApi, protocol), PiAiAdapter: CapturingAdapter }),
+      fetchImpl: async () => response(['deepseek-v4.1-flash', 'glm-5.3-flash']) })
+    try {
+      await f.api.refresh()
+      const piProvider = config.profiles().get('opendesign').piProvider
+      const models = piProvider.getModels()
+      const common = { sessionId: 'synthetic-cache-session', temperature: 0.4, apiKey: 'fake-runtime-key' }
+      // Exercise pi-ai transport options directly: cacheRetention is not a
+      // public DSH GenerateOptions field, so the host need not forward it.
+      for (const method of ['stream', 'streamSimple']) {
+        const model = models.find(model => model.id === 'deepseek-v4.1-flash')
+        for (const retention of [undefined, 'none', 'short', 'long']) {
+          const options = { ...common, ...(retention === undefined ? {} : { cacheRetention: retention }) }
+          await collect(piProvider[method](model, { messages: [] }, options))
+          const { opts } = wire.at(-1)
+          assert.equal(opts.cacheRetention, retention ?? 'long')
+          assert.equal(model.compat.supportsLongCacheRetention, true)
+          assert.equal(opts.sessionId, common.sessionId)
+          assert.equal(opts.temperature, common.temperature)
+          assert.equal(opts.apiKey, common.apiKey)
+          assert.equal(opts.headers, undefined, 'no OpenCode headers')
+          assert.equal(options.cacheRetention, retention, 'caller options are unchanged')
+        }
+        const other = models.find(model => model.id === 'glm-5.3-flash')
+        await collect(piProvider[method](other, { messages: [] }, common))
+        assert.equal(wire.at(-1).opts.cacheRetention, undefined, 'other models keep their defaults')
+        assert.equal(other.compat, undefined)
+      }
+    } finally { f.api.dispose() }
+  })
+}
+
 test('successful updates replace snapshots without changing a prepared generation', async () => {
   let ids = ['old']
   const f = await fixture({ fetchImpl: async () => response(ids) })
@@ -328,17 +369,54 @@ test('a host package without a usable manifest is refused, not guessed at', asyn
 })
 
 test('a pi-ai version the bridge was not written for is rejected before any import', async () => {
-  const newer = loaderFixture({ piVersion: '1.3.0' })
+  const newer = loaderFixture({ piVersion: '1.4.0' })
   await assert.rejects(loadOpenDesignHost(newer.ctx, newer.seams), { code: 'unsupported-host' })
   assert.equal(newer.imports.length, 0)
+})
+
+
+for (const protocol of ['chat-completions', 'responses']) {
+  test(protocol + ': the verified alpha.2 / pi-ai 1.3 host is supported', async () => {
+    const f = loaderFixture({ hostVersion: '0.2.2-alpha.2', piVersion: '1.3.0', protocol })
+    const resolved = await loadOpenDesignHost(f.ctx, f.seams)
+    assert.equal(resolved.hostVersion, '0.2.2-alpha.2')
+    assert.equal(resolved.piVersion, '1.3.0')
+    const api = await createOpenDesignProvider({ get: () => undefined, effect() {}, llm: {
+      registerAdapter(ids) { assert.deepEqual(ids, ['opendesign']); const release = () => {}; release.replace = () => {}; return release },
+    } }, { auth: { resolveAuth() {} }, protocol, loadHost: async () => resolved })
+    api.dispose()
+  })
+}
+
+test('unverified pi-ai lines and malformed versions are still refused before import', async () => {
+  for (const piVersion of ['1.2.0', '1.4.0', '2.0.0', '1.3', '1.3.broken', undefined]) {
+    const f = loaderFixture({ piVersion })
+    if (piVersion === undefined) {
+      const original = f.ctx.get().packageOf
+      f.ctx.get().packageOf = (name, importer) => name === '@earendil-works/pi-ai'
+        ? { ...original(name, importer), version: undefined } : original(name, importer)
+    }
+    await assert.rejects(loadOpenDesignHost(f.ctx, f.seams), { code: 'unsupported-host' })
+    assert.equal(f.imports.length, 0)
+  }
+})
+
+test('a supported version without the adapter methods is not accepted', async () => {
+  const f = loaderFixture({ hostVersion: '0.2.2-alpha.2', piVersion: '1.3.0' })
+  const importer = f.seams.importModule
+  f.seams.importModule = async specifier => specifier === f.seams.resolveModule()
+    ? { PiAiAdapter: class IncompleteAdapter {} } : importer(specifier)
+  await assert.rejects(loadOpenDesignHost(f.ctx, f.seams), { code: 'unsupported-host' })
 })
 
 test('a host patch release stays on the compatibility line instead of dead-ending', async () => {
   // Regression: the gate compared version strings for equality, so upgrading DSH
   // from rc.2 to rc.3 dropped the whole OpenDesign route without an explanation.
-  const upgraded = loaderFixture({ hostVersion: '0.2.1-rc.3' })
-  const host = await loadOpenDesignHost(upgraded.ctx, upgraded.seams)
-  assert.equal(host.hostVersion, '0.2.1-rc.3', 'a patch release still resolves')
+  for (const hostVersion of ['0.2.1-rc.3', '0.2.1-rc.5']) {
+    const upgraded = loaderFixture({ hostVersion })
+    const host = await loadOpenDesignHost(upgraded.ctx, upgraded.seams)
+    assert.equal(host.hostVersion, hostVersion, 'a patch release still resolves')
+  }
 
   const moved = loaderFixture({ hostVersion: '0.3.0' })
   await assert.rejects(() => loadOpenDesignHost(moved.ctx, moved.seams), /verified host pi-ai adapter/,

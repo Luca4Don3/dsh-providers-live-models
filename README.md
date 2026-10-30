@@ -5,7 +5,7 @@ English | [中文](README.zh-CN.md)
 [![test](https://github.com/Luca4Don3/dsh-providers-live-models/actions/workflows/test.yml/badge.svg)](https://github.com/Luca4Don3/dsh-providers-live-models/actions/workflows/test.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Live model catalogs for **DeepSeek Harness (DSH)**: OpenCode Go, OpenCode Zen, native OpenAI Codex and OpenDesign. The plugin refreshes each route at runtime, adds per-model switches, sign-in and subscription usage, and keeps OpenCode's gateway headers and prompt-cache retention. Nothing is bundled, so upstream changes need no release here.
+Live model catalogs for **DeepSeek Harness (DSH)**: OpenCode Go, OpenCode Zen, native OpenAI Codex and OpenDesign. The plugin refreshes each route at runtime, adds per-model switches, sign-in and subscription usage, and keeps OpenCode's gateway headers and prompt-cache retention. OpenDesign DeepSeek models also request long prompt-cache retention. Nothing is bundled, so upstream changes need no release here.
 
 It also adds compaction recovery: long histories are summarized in capacity-aware batches, and failures or cancellation preserve the original history.
 
@@ -28,7 +28,7 @@ CLI:
 dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
-Requires DSH 0.1.5-rc.1 or newer. OpenDesign also needs DSH 0.2.1-rc.2 with pi-ai 1.1.0; a mismatch disables only OpenDesign. The host needs GitHub access for the `github:` spec.
+Requires DSH 0.1.5-rc.1 or newer. OpenDesign accepts DSH 0.2.x with the explicitly verified pi-ai 1.1.x or 1.3.x compatibility lines. Real 0.2.1-rc.5 / patched pi-ai 1.1.0 and 0.2.2-alpha.2 / patched pi-ai 1.3.0 both pass the offline host smoke tests. Unverified pi-ai lines are refused, and the actual adapter and transport methods are checked before registration. A mismatch disables only OpenDesign. The host needs GitHub access for the `github:` spec.
 
 ## Use
 
@@ -55,6 +55,8 @@ config:
 
 `stripTemperature` is only for OpenDesign gateways that reject `temperature`. `quotaSource` accepts `auto`, `vela` or `control`.
 
+OpenDesign models whose IDs start with `deepseek` declare `compat.supportsLongCacheRetention: true` and default to `cacheRetention: long`. The Chat Completions and Responses transports can then send `prompt_cache_retention: "24h"` and a session-based `prompt_cache_key`. Explicit transport retention options are preserved, and other models are unchanged. This is a request preference, not a guarantee of the gateway's cache lifetime or hit rate.
+
 ## Limits
 
 - A model without a complete descriptor, or with an unsupported protocol, is reported and skipped, not guessed.
@@ -71,6 +73,8 @@ npm test
 ```
 
 Offline fixtures; no network or credentials needed. CI runs Node 18 and 24.
+
+For an optional real-host smoke test (Node 24.9+), install the exact host and its official patched pi-ai version into an isolated fixture directory, then run `node --experimental-import-meta-resolve scripts/verify-opendesign-host.mjs <fixture-dir>`. It rejects real HTTP requests and uses synthetic credentials plus local SSE fixtures; it does not test vendor acceptance or the live GUI. Exit code 2 means the OpenDesign host-version gate rejected the fixture.
 
 More: [OpenDesign](docs/opendesign.md) · [provider contract](docs/provider-contract.md) · [protocol probing](docs/protocol-probing.md) · [catalog injection](docs/catalog-injection.md)
 

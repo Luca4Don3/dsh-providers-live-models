@@ -5,7 +5,7 @@
 [![test](https://github.com/Luca4Don3/dsh-providers-live-models/actions/workflows/test.yml/badge.svg)](https://github.com/Luca4Don3/dsh-providers-live-models/actions/workflows/test.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-为 **DeepSeek Harness（DSH）** 提供实时模型目录：OpenCode Go、OpenCode Zen、原生 OpenAI Codex 与 OpenDesign。插件在运行时刷新各路由，提供逐模型开关、登录入口与订阅额度，并保留 OpenCode 网关要求的会话头和提示缓存。插件不内置模型，上游变化无需这里发版。
+为 **DeepSeek Harness（DSH）** 提供实时模型目录：OpenCode Go、OpenCode Zen、原生 OpenAI Codex 与 OpenDesign。插件在运行时刷新各路由，提供逐模型开关、登录入口与订阅额度，并保留 OpenCode 网关要求的会话头和提示缓存；OpenDesign 的 DeepSeek 模型也会请求长提示缓存。插件不内置模型，上游变化无需这里发版。
 
 另含压缩恢复：长历史按容量分段摘要，失败或取消保留原历史。
 
@@ -28,7 +28,7 @@ CLI：
 dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
-需要 DSH 0.1.5-rc.1+。OpenDesign 另需 DSH 0.2.1-rc.2 及 pi-ai 1.1.0；不匹配时只停用 OpenDesign。`github:` spec 需要宿主机能访问 GitHub。
+需要 DSH 0.1.5-rc.1+。OpenDesign 接受 DSH 0.2.x 搭配明确验证过的 pi-ai 1.1.x 或 1.3.x。真实 0.2.1-rc.5 / 官方补丁版 pi-ai 1.1.0、0.2.2-alpha.2 / 官方补丁版 pi-ai 1.3.0 均通过离线宿主烟测；未验证的 pi-ai 版本线仍拒绝，注册前还会核对实际适配器及传输方法。不匹配时只停用 OpenDesign。`github:` spec 需要宿主机能访问 GitHub。
 
 ## 使用
 
@@ -55,6 +55,8 @@ config:
 
 `stripTemperature` 只在 OpenDesign 网关拒绝 `temperature` 时开启；`quotaSource` 可选 `auto`、`vela`、`control`。
 
+OpenDesign 中 ID 以 `deepseek` 开头的模型声明 `compat.supportsLongCacheRetention: true`，请求默认使用 `cacheRetention: long`。Chat Completions 和 Responses 传输据此发送 `prompt_cache_retention: "24h"` 及基于会话的 `prompt_cache_key`（需要会话 ID）；显式传输选项优先，其他模型不变。这是请求偏好，不保证网关实际保留时长或命中率。
+
 ## 限制
 
 - 缺少完整描述符或协议不支持的模型只报告、不猜测，也不进入选择器。
@@ -71,6 +73,8 @@ npm test
 ```
 
 离线固件，无需联网或凭据；CI 跑 Node 18 与 24。
+
+可选真实宿主烟测（Node 24.9+）：在独立测试目录安装精确版本的宿主及官方补丁版 pi-ai，然后运行 `node --experimental-import-meta-resolve scripts/verify-opendesign-host.mjs <fixture-dir>`。脚本禁止实际 HTTP 请求，使用合成凭据和本地 SSE 固件；不验证上游接受情况或正在运行的 GUI。退出码 2 表示 OpenDesign 宿主版本门拒绝该环境。
 
 更多：[OpenDesign](docs/opendesign.md) · [Provider 契约](docs/provider-contract.md) · [协议探测](docs/protocol-probing.md) · [目录注入](docs/catalog-injection.md)
 
