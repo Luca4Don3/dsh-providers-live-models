@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
 import { createOpenDesignProvider, loadOpenDesignHost } from '../lib/opendesign/provider.js'
 import { OPENDESIGN_BASE_URL as BASE, OPENDESIGN_MODELS_URL as MODELS } from '../lib/opendesign/models.js'
+import { handleOpenDesignHttp } from '../lib/opendesign/http.js'
 
 class LlmError extends Error { constructor(message, code) { super(message); this.code = code } }
 const row = id => ({ id, metadata: { context_limit: 128000, context_budget: 32000 } })
@@ -59,6 +60,53 @@ async function fixture(options = {}) {
   return { api, ctx, calls, wire, routes, originals, effects, adapter: routes.get('opendesign'),
     identity: value => { identity = value }, time: value => { tick = value } }
 }
+
+test('冷启动读取目录无需聊天选择器，并发与缓存复用且失败保留其他路由', async () => {
+  const gate = deferred()
+  let requests = 0, broken = false
+  const f = await fixture({ fetchImpl: async () => {
+    requests += 1
+    if (broken) throw new Error('Bearer synthetic-private-key')
+    await gate.promise
+    return response()
+  } })
+  const native = ['opencode-go', 'opencode', 'openai-codex'].map(id => ({ id, label: id, models: [{ id: 'native', name: '原生' }] }))
+  const read = async (path = '/routes') => {
+    let status, body
+    await handleOpenDesignHttp({}, { method: 'GET', url: '/dsh-providers-live-models/opendesign' + path,
+      headers: { host: 'localhost:1234' } }, {
+      writeHead(value) { status = value }, end(value) { body = JSON.parse(value) },
+    }, { auth: { status: async () => ({ loggedIn: true, mode: 'api-key' }) }, getProvider: () => f.api, getRoutes: () => native })
+    assert.equal(status, 200)
+    return body
+  }
+  try {
+    assert.equal(requests, 0)
+    const first = read(), second = read('/models')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(requests, 1)
+    gate.resolve()
+    assert.equal((await first).routes.at(-1).models[0].id, 'm')
+    assert.equal((await second).models[0].id, 'm')
+    await read()
+    assert.equal(requests, 1)
+    broken = true; f.time(10 ** 12)
+    const failed = await read()
+    assert.equal(requests, 2)
+    assert.equal(failed.routes.length, 4)
+    assert.equal(failed.status.error, 'catalog-unavailable')
+    assert.ok(!JSON.stringify(failed).includes('synthetic-private-key'))
+    f.identity(null)
+    const loggedOut = await read()
+    assert.equal(loggedOut.routes.length, 3)
+    assert.equal(loggedOut.status.state, 'idle')
+    f.identity({ mode: 'api-key', runtimeKey: 'synthetic-private-key', accountKey: 'hash-account-b' })
+    const coldFailure = await read()
+    assert.equal(coldFailure.routes.length, 3)
+    assert.equal(coldFailure.status.error, 'catalog-unavailable')
+    assert.ok(!JSON.stringify(coldFailure).includes('synthetic-private-key'))
+  } finally { gate.resolve(); f.api.dispose() }
+})
 
 test('factory is lazy and owns only its new route; host failure registers nothing', async () => {
   const f = await fixture()

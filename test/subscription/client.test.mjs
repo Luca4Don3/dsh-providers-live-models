@@ -40,14 +40,14 @@ function memoryStorage() {
   return { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) }
 }
 
-function loadClient({ status = null, fetchImpl, slots = createSlots(), now = () => Date.now(), storage = memoryStorage() } = {}) {
+function loadClient({ status = null, fetchImpl, slots = createSlots(), now = () => Date.now(), storage = memoryStorage(), confirm } = {}) {
   let entry
   const states = []
   const effects = []
   const warnings = []
   let cursor = 0
   new Script(source, { filename: 'client.js' }).runInNewContext({
-    window: { localStorage: storage, __ModuleLoader__: { load(value) { entry = value } } },
+    window: { localStorage: storage, confirm, __ModuleLoader__: { load(value) { entry = value } } },
     console: { warn: value => warnings.push(value) },
     fetch: fetchImpl,
     setInterval,
@@ -1067,6 +1067,51 @@ test('checkbox edits stay local until Save posts the changed route once', async 
   assert.equal(posts.length, 1, 'exactly one save request')
   assert.deepEqual(JSON.parse(posts[0][1].body), { provider: 'opendesign', enabledModels: ['od-one', 'od-two'] })
   ui.dispose()
+})
+
+test('刷新取消不请求且保留草稿，确认后先刷新再读取并清空已删除模型', async () => {
+  const calls = []
+  let confirmed = false, refreshed = false, finishRefresh
+  const refreshing = new Promise(resolve => { finishRefresh = resolve })
+  const ui = loadClient({ confirm: () => confirmed, fetchImpl: async (url, init) => {
+    calls.push([url, init])
+    if (url.endsWith('/opendesign/models/refresh')) { refreshed = true; await refreshing; return { ...response({ error: 'provider-unavailable' }), status: 503 } }
+    if (url.endsWith('/opendesign/routes')) return response({ routes: [
+      { id: 'opencode-go', label: 'GO', group: 'opencode', models: [{ id: refreshed ? 'two' : 'one', name: '一', enabled: true }] },
+      { id: 'opencode', label: 'Zen', group: 'opencode', models: [] },
+      { id: 'openai-codex', label: 'Codex', group: 'opencode', models: [] },
+    ] })
+    return response({ loggedIn: false })
+  } })
+  try {
+    for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+    const box = expandAll(ui).find(node => node.type === 'input' && node.props?.type === 'checkbox')
+    box.props.onChange({ target: { checked: false } })
+    const before = calls.length
+    elements(ui.render()).find(node => node.type === 'button' && node.children.includes('刷新列表')).props.onClick()
+    await tick()
+    assert.equal(calls.length, before)
+    assert.ok(elements(ui.render()).some(node => node.children.includes('有未保存的改动')))
+    assert.equal(elements(ui.render()).find(node => node.type === 'input' && node.props?.type === 'checkbox').props.checked, false)
+    confirmed = true
+    elements(ui.render()).find(node => node.type === 'button' && node.children.includes('刷新列表')).props.onClick()
+    const pendingNodes = elements(ui.render())
+    assert.ok(pendingNodes.some(node => node.children.includes('正在读取…')))
+    const pendingBox = pendingNodes.find(node => node.type === 'input' && node.props?.type === 'checkbox')
+    assert.equal(pendingBox.props.disabled, true)
+    pendingBox.props.onChange({ target: { checked: false } })
+    assert.ok(!elements(ui.render()).some(node => node.children.includes('有未保存的改动')))
+    finishRefresh()
+    await tick(); await tick()
+    const requests = calls.slice(before)
+    assert.deepEqual(requests.map(([url]) => url.split('/').at(-1)), ['refresh', 'routes'])
+    assert.equal(requests[0][1].method, 'POST')
+    const nodes = elements(ui.render())
+    assert.ok(nodes.some(node => node.children.includes('OpenDesign 目录刷新失败或尚未就绪；已尝试重读其他渠道，请重试。')))
+    assert.ok(!nodes.some(node => node.children.includes('有未保存的改动')))
+    assert.ok(!nodes.some(node => node.props?.['data-route-model'] === 'one'))
+    assert.equal(nodes.find(node => node.type === 'input' && node.props?.type === 'checkbox').props.checked, true)
+  } finally { ui.dispose() }
 })
 
 test('toggling all edits the draft without hitting the server', async () => {

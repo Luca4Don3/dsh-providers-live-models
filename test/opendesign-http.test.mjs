@@ -159,6 +159,59 @@ test('a model list without an adapter is empty rather than an error', async () =
   assert.equal(result.body.status.state, 'unavailable')
 })
 
+test('首次目录读取等待延迟初始化并经登录入口返回模型', async () => {
+  let provider, finish
+  const initialization = new Promise(resolve => { finish = resolve })
+  const result = res()
+  const pending = handleLoginHttp({}, req('GET', '/routes'), result, {
+    openDesignAuth: authFixture(), getOpenDesignProvider: () => provider,
+    openDesignInitialization: initialization,
+  })
+  assert.equal(result.status, undefined)
+  provider = { async refresh() { this.ready = true },
+    status: () => ({ configured: true, modelCount: 1 }),
+    models() { return this.ready ? [{ id: 'late', name: '延迟模型' }] : [] } }
+  finish()
+  await pending
+  assert.equal(result.body.routes[0].models[0].id, 'late')
+})
+
+test('初始化失败或超时仍返回原生路由及白名单错误，卸载结束等待', async () => {
+  for (const mode of ['失败', '超时', '卸载']) {
+    const abort = new AbortController()
+    const result = res()
+    const initialization = mode === '失败' ? Promise.reject(new Error('secret-token')) : new Promise(() => {})
+    const pending = handleOpenDesignHttp({}, req('GET', '/routes'), result, {
+      auth: authFixture(), getProvider: () => undefined, initialization,
+      signal: abort.signal, initializationTimeoutMs: mode === '卸载' ? 10000 : 5,
+      getRoutes: () => [{ id: 'native', label: '原生', models: [{ id: 'one', name: '一' }] }],
+    })
+    if (mode === '卸载') abort.abort()
+    await pending
+    assert.equal(result.body.routes[0].id, 'native')
+    assert.equal(result.body.status.error, 'catalog-unavailable')
+    assert.ok(!JSON.stringify(result.body).includes('secret-token'))
+  }
+})
+
+test('等待初始化不阻塞认证修改，卸载后不预热提供方', async () => {
+  const abort = new AbortController()
+  abort.abort()
+  let refreshes = 0
+  const result = res()
+  await handleOpenDesignHttp({}, req('GET', '/models'), result, {
+    auth: authFixture(), signal: abort.signal, initialization: new Promise(() => {}),
+    getProvider: () => ({ refresh() { refreshes++ }, models: () => [] }),
+  })
+  assert.equal(refreshes, 0)
+  const auth = authFixture()
+  const changed = res()
+  await handleOpenDesignHttp({}, req('POST', '/logout'), changed, {
+    auth, initialization: new Promise(() => {}),
+  })
+  assert.equal(changed.status, 200)
+})
+
 test('the enabled set persists only known ids and re-applies the route', async () => {
   const applied = [], saved = []
   const provider = { status: () => ({ available: true, configured: true, modelCount: 1 }), models: () => [{ id: 'od-one', name: 'One', contextWindow: 1, maxTokens: 1, input: ['text'] }],
