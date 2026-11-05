@@ -375,21 +375,34 @@ test('a pi-ai version the bridge was not written for is rejected before any impo
 })
 
 
+// Every shipped host/pi-ai pairing, not just the newest. A release line that
+// stops working here is a real regression for users who have not upgraded.
+const VERIFIED = [
+  ['0.2.1-rc.5', '1.1.0'],
+  ['0.2.2-alpha.2', '1.3.0'],
+  ['0.2.2-alpha.3', '1.3.0'],
+  ['0.2.2-rc.1', '1.3.0'],
+  // Ahead of any DSH release: accepted only because it passes this same check.
+  ['0.2.2-rc.1', '1.5.0'],
+]
+
 for (const protocol of ['chat-completions', 'responses']) {
-  test(protocol + ': the verified alpha.2 / pi-ai 1.3 host is supported', async () => {
-    const f = loaderFixture({ hostVersion: '0.2.2-alpha.2', piVersion: '1.3.0', protocol })
-    const resolved = await loadOpenDesignHost(f.ctx, f.seams)
-    assert.equal(resolved.hostVersion, '0.2.2-alpha.2')
-    assert.equal(resolved.piVersion, '1.3.0')
-    const api = await createOpenDesignProvider({ get: () => undefined, effect() {}, llm: {
-      registerAdapter(ids) { assert.deepEqual(ids, ['opendesign']); const release = () => {}; release.replace = () => {}; return release },
-    } }, { auth: { resolveAuth() {} }, protocol, loadHost: async () => resolved })
-    api.dispose()
-  })
+  for (const [hostVersion, piVersion] of VERIFIED) {
+    test(protocol + ': DSH ' + hostVersion + ' with pi-ai ' + piVersion + ' is supported', async () => {
+      const f = loaderFixture({ hostVersion, piVersion, protocol })
+      const resolved = await loadOpenDesignHost(f.ctx, f.seams)
+      assert.equal(resolved.hostVersion, hostVersion)
+      assert.equal(resolved.piVersion, piVersion)
+      const api = await createOpenDesignProvider({ get: () => undefined, effect() {}, llm: {
+        registerAdapter(ids) { assert.deepEqual(ids, ['opendesign']); const release = () => {}; release.replace = () => {}; return release },
+      } }, { auth: { resolveAuth() {} }, protocol, loadHost: async () => resolved })
+      api.dispose()
+    })
+  }
 }
 
 test('unverified pi-ai lines and malformed versions are still refused before import', async () => {
-  for (const piVersion of ['1.2.0', '1.4.0', '2.0.0', '1.3', '1.3.broken', undefined]) {
+  for (const piVersion of ['1.2.0', '1.4.0', '1.6.0', '2.0.0', '1.3', '1.3.broken', undefined]) {
     const f = loaderFixture({ piVersion })
     if (piVersion === undefined) {
       const original = f.ctx.get().packageOf

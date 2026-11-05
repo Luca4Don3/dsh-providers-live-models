@@ -2,12 +2,15 @@
 
 ## Verified package combinations
 
-| Host adapter | Host-owned pi-ai | Package-level offline tests |
+| Host adapter | Host-owned pi-ai | Status |
 | --- | --- | --- |
-| `@deepseek-ai/dsh-llm-pi-ai@0.2.1-rc.5` | `1.1.0`, with the matching DSH patch | PASS |
-| `@deepseek-ai/dsh-llm-pi-ai@0.2.2-alpha.2` | `1.3.0`, with the matching DSH patch | PASS |
+| `@deepseek-ai/dsh-llm-pi-ai@0.2.1-rc.5` | `1.1.0` (patched) | PASS |
+| `@deepseek-ai/dsh-llm-pi-ai@0.2.2-alpha.2` | `1.3.0` (patched) | PASS |
+| `@deepseek-ai/dsh-llm-pi-ai@0.2.2-alpha.3` | `1.3.0` (patched) | PASS |
+| `@deepseek-ai/dsh-llm-pi-ai@0.2.2-rc.1` | `1.3.0` (patched) | PASS |
+| `@deepseek-ai/dsh-llm-pi-ai@0.2.2-rc.1` | `1.5.0` (unpatched, ahead of release) | PASS |
 
-The gate accepts DSH 0.2.x and **only** the verified pi-ai 1.1.x / 1.3.x lines. It does not permit arbitrary pi-ai 1.x releases. Malformed versions, missing adapter/transport methods and unproven package ownership are rejected before route registration. It always uses the host-owned package rather than a profile peer.
+The gate accepts DSH 0.2.x and **only** the verified pi-ai 1.1.x / 1.3.x lines, plus 1.5.0 which passes the same smoke test against the 0.2.2-rc.1 adapter ahead of any release shipping it. It does not permit arbitrary pi-ai 1.x releases. Malformed versions, missing adapter/transport methods and unproven package ownership are rejected before route registration. It always uses the host-owned package rather than a profile peer.
 
 ## What was exercised
 
