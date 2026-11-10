@@ -30,6 +30,17 @@ test('a roster-supplied name still wins over the display table', () => {
   assert.equal(models[0].name, 'Team alias')
 })
 
+test('the eco Flash variant declares the same reasoning control as the standard one', () => {
+  const { models } = normalize({ data: [row('deepseek-v4.1-flash-eco'), row('deepseek-v4.1-flash')] })
+  const eco = models[0], standard = models[1]
+  assert.equal(eco.name, 'DeepSeek V4.1 Flash Eco', 'a readable name instead of the bare id')
+  assert.deepEqual(eco.thinkingLevelMap, standard.thinkingLevelMap,
+    'same weights and documented capabilities, so the same low/high/max control')
+  assert.deepEqual(eco.thinkingLevels, ['low', 'high', 'max'], 'the opt-in set is recorded for diagnostics')
+  // The catalog still lists text only; do not invent image support from a probe.
+  assert.deepEqual(eco.input, ['text'])
+})
+
 test('known models declare the reasoning levels they accept', () => {
   const { models } = normalize({ data: [row('glm-5.3-flash'), row('deepseek-v4.1-flash'), row('unknown-model')] })
   const glm = models[0]
