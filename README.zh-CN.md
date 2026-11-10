@@ -55,6 +55,8 @@ config:
 
 `stripTemperature` 只在 OpenDesign 网关拒绝 `temperature` 时开启；`quotaSource` 可选 `auto`、`vela`、`control`。
 
+OpenDesign 在宿主默认可重试集合之外，额外重试 `MALFORMED_RESPONSE`。自 DSH 0.2.2 起，单个不可用的工具参数串会在任何工具执行之前让整个助手回合失败，而宿主默认不重试该错误码。若网关把两个并行工具调用合并进同一个 `arguments` 字符串，回合会直接结束，只能由用户再发一条消息继续。重试次数与退避沿用宿主默认值。详见 [`docs/opendesign.md`](docs/opendesign.md#retry-policy)。
+
 OpenDesign 中 ID 以 `deepseek` 开头的模型声明 `compat.supportsLongCacheRetention: true`，请求默认使用 `cacheRetention: long`。Chat Completions 和 Responses 传输据此发送 `prompt_cache_retention: "24h"` 及基于会话的 `prompt_cache_key`（需要会话 ID）；显式传输选项优先，其他模型不变。这是请求偏好，不保证网关实际保留时长或命中率。
 
 ## 限制

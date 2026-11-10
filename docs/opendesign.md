@@ -63,6 +63,32 @@ mocks, not against the vendor endpoint.
 Existing OpenCode per-model protocol selection and the native Codex Responses
 transport are not altered.
 
+## Retry policy
+
+This route declares its own policy instead of inheriting the host default, which
+is `EMPTY_RESPONSE`, `RATE_LIMIT`, `SERVER`, `TIMEOUT` and `TRANSPORT`.
+
+`MALFORMED_RESPONSE` is added. DSH 0.2.2 moved the transport to
+`parseToolCallArguments()`, which parses completed tool arguments strictly
+instead of keeping a partially parsed prefix through `partial-json`. One
+unusable arguments string therefore fails the entire assistant turn before any
+tool runs. A gateway that merges two parallel tool calls into a single
+`arguments` string — observed on `deepseek-v4.1-flash` behind
+`amr-link.open-design.ai` — trips exactly that parse, and because the code was
+outside the default admission set the turn was never repeated: the user had to
+send another message to continue.
+
+Repeating the request is safe here. The failure is raised while completing the
+assistant stream, before a tool is dispatched, so no side effect is repeated;
+`llm-retry` only re-requests the model call. The count and backoff stay the host
+defaults because the plugin resolves the policy through the host's
+`resolveRetryPolicy()` rather than hard-coding them.
+
+This is a mitigation, not a cure: if the gateway keeps merging calls, the
+retries run out and the turn still fails. It buys the same request another
+attempt with a fresh sample instead of dropping the turn on the first malformed
+envelope.
+
 ## Request budget
 
 `outputTokenBudget` (default 8192) is a **local request budget**, not a claim

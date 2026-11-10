@@ -12,10 +12,18 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 const collect = async iterable => { const values = []; for await (const value of iterable) values.push(value); return values }
 
 // Deliberately implements only the verified host seam: immutable profile snapshots.
+// Faithful to the host: the policy is read back from the profile snapshot, which
+// is exactly how the real PiAiAdapter answers providerRetryPolicy().
+const resolveRetryPolicy = (config, path) => {
+  const retryableCodes = config.retryableCodes ?? ['EMPTY_RESPONSE', 'RATE_LIMIT', 'SERVER', 'TIMEOUT', 'TRANSPORT']
+  if (!Array.isArray(retryableCodes) || retryableCodes.length === 0) throw new Error(`${path}.retryableCodes must not be empty`)
+  return Object.freeze({ mode: 'normal', maxRetries: 5, retryableCodes: Object.freeze([...retryableCodes]),
+    initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1 })
+}
 class PiAiAdapter {
   constructor(config) { this.config = config }
   providerInfo(id) { return { id, name: 'OpenDesign' } }
-  providerRetryPolicy() {}
+  providerRetryPolicy(id) { return this.config.profiles().get(id)?.retryPolicy }
   imageRequestTarget(_provider, _model, image) { return image }
   async listModels(provider) {
     const profile = this.config.profiles().get(provider)
@@ -36,7 +44,8 @@ class PiAiAdapter {
     }.bind(this) }
   }
 }
-const host = (protocolApi, protocol = 'chat-completions') => ({ PiAiAdapter, LlmError, protocolApi, protocol, hostVersion: '0.2.1-rc.2', piVersion: '1.1.0' })
+const host = (protocolApi, protocol = 'chat-completions') => ({ PiAiAdapter, LlmError, resolveRetryPolicy,
+  protocolApi, protocol, hostVersion: '0.2.1-rc.2', piVersion: '1.1.0' })
 async function fixture(options = {}) {
   let identity = { mode: 'api-key', runtimeKey: 'fake-runtime-key', accountKey: 'hash-account-a' }, tick = 1000
   // Synthetic registrations only: this does not activate the real WorkBuddy plugin.
@@ -361,7 +370,7 @@ function loaderFixture({ shared = false, piVersion = '1.1.0', protocol = 'chat-c
       if (specifier === parent) return { PiAiAdapter }
       if (specifier.includes('responses') || specifier.includes('completions')) return {
         openAIResponsesApi: () => ({ stream() {}, streamSimple() {} }), openAICompletionsApi: () => ({ stream() {}, streamSimple() {} }) }
-      if (specifier.includes('llm')) return { LlmError }
+      if (specifier.includes('llm')) return { LlmError, resolveRetryPolicy }
       throw new Error('unexpected import')
     } }
   return { ctx: { get: () => packages }, seams, imports, resolutions }
@@ -482,4 +491,42 @@ test('a host patch release stays on the compatibility line instead of dead-endin
   const moved = loaderFixture({ hostVersion: '0.3.0' })
   await assert.rejects(() => loadOpenDesignHost(moved.ctx, moved.seams), /verified host pi-ai adapter/,
     'a major.minor change still fails closed')
+})
+
+test('completed tool arguments the transport rejected are retried instead of ending the turn', async () => {
+  // Regression: DSH 0.2.2 makes pi-ai parse finished tool arguments strictly, so a
+  // gateway that merges two parallel calls into one arguments string fails the whole
+  // assistant turn with MALFORMED_RESPONSE. The host default does not repeat that
+  // code, which left the user with a dead turn; OpenDesign declares it retryable.
+  const f = await fixture()
+  const policy = f.adapter.providerRetryPolicy('opendesign')
+  assert.equal(policy.mode, 'normal')
+  assert.equal(policy.maxRetries, 5, 'the host default retry count is preserved')
+  assert.ok(policy.retryableCodes.includes('MALFORMED_RESPONSE'), 'a rejected tool call is repeated')
+  for (const code of ['EMPTY_RESPONSE', 'RATE_LIMIT', 'SERVER', 'TIMEOUT', 'TRANSPORT'])
+    assert.ok(policy.retryableCodes.includes(code), code + ' stays retryable')
+  // The default set is the floor, not something this route narrows.
+  assert.equal(policy.retryableCodes.length, 6)
+  assert.equal(policy.initialDelayMs, 500)
+  assert.equal(policy.maxDelayMs, 10000)
+  f.api.dispose()
+})
+
+test('every published snapshot carries the same retry policy', async () => {
+  const f = await fixture()
+  await f.api.refresh()
+  assert.ok(f.adapter.providerRetryPolicy('opendesign').retryableCodes.includes('MALFORMED_RESPONSE'))
+  f.identity({ mode: 'api-key', runtimeKey: 'fake-runtime-key-2', accountKey: 'hash-account-c' })
+  await f.api.refresh()
+  assert.ok(f.adapter.providerRetryPolicy('opendesign').retryableCodes.includes('MALFORMED_RESPONSE'),
+    'an account switch rebuilds the profile and must keep the policy')
+  f.api.dispose()
+})
+
+test('a host that stopped exporting resolveRetryPolicy is refused before any profile is built', async () => {
+  const f = loaderFixture()
+  const importer = f.seams.importModule
+  f.seams.importModule = async specifier => specifier.includes('llm')
+    ? { LlmError } : importer(specifier)
+  await assert.rejects(loadOpenDesignHost(f.ctx, f.seams), { code: 'unsupported-host' })
 })

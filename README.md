@@ -55,6 +55,13 @@ config:
 
 `stripTemperature` is only for OpenDesign gateways that reject `temperature`. `quotaSource` accepts `auto`, `vela` or `control`.
 
+OpenDesign retries `MALFORMED_RESPONSE` in addition to the host default set. Since
+DSH 0.2.2 a single unusable tool-arguments string fails the whole assistant turn
+before any tool runs, and the host default does not repeat that code. A gateway
+that merges two parallel tool calls into one `arguments` string would otherwise
+end the turn and wait for the user to send another message. The retry count and
+backoff stay the host defaults. See [`docs/opendesign.md`](docs/opendesign.md#retry-policy).
+
 OpenDesign models whose IDs start with `deepseek` declare `compat.supportsLongCacheRetention: true` and default to `cacheRetention: long`. The Chat Completions and Responses transports can then send `prompt_cache_retention: "24h"` and a session-based `prompt_cache_key`. Explicit transport retention options are preserved, and other models are unchanged. This is a request preference, not a guarantee of the gateway's cache lifetime or hit rate.
 
 ## Limits
