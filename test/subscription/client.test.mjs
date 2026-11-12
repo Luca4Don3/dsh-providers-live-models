@@ -524,7 +524,7 @@ test('account page queries only configured subscriptions and refreshes their rem
     calls.push(url)
     return response(url.endsWith('/subscriptions')
       ? { subscriptions: [{ providerId: 'openai-codex', label: 'OpenAI Codex', cacheKey: 'fixture-scope' }] }
-      : { status: 'ready', windows: [{ id: 'primary', remainingPercent: 75, resetsAt: 1792166400 }, { id: 'secondary', remainingPercent: 60 }], capturedAt: 1792152000000 })
+      : { status: 'ready', windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 75, resetsAt: 1792166400 }, { id: 'secondary', windowMinutes: 10080, remainingPercent: 60 }], capturedAt: 1792152000000 })
   } })
   assert.equal(ui.renderBalances(), null)
   const cleanup = ui.effects[0]()
@@ -812,7 +812,7 @@ test('a new client process restores cached balances through the entire startup q
   const subscriptions = [{ providerId: 'opencode-go', label: 'OpenCode Go', cacheKey: 'fixture-scope' }]
   const first = loadClient({ storage, now: () => 10000, fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions }
-    : { status: 'ready', capturedAt: 10000, accountKey: 'fixture-private-account', token: '<token>', windows: [{ id: 'weekly', remainingPercent: 60 }] }) })
+    : { status: 'ready', capturedAt: 10000, accountKey: 'fixture-private-account', token: '<token>', windows: [{ id: 'weekly', windowMinutes: 10080, remainingPercent: 60 }] }) })
   first.renderBalances()
   const cleanup = first.effects[0]()
   await tick()
@@ -981,13 +981,43 @@ test('OpenDesign account login renders only the official activation link and can
   ui.dispose()
 })
 
+test('every provider names a limit window by its length, not by its vendor label', async () => {
+  const subscriptions = [
+    { providerId: 'openai-codex', cacheKey: 'codex' },
+    { providerId: 'opencode-go', cacheKey: 'go' },
+    { providerId: 'opendesign', label: 'OpenDesign', cacheKey: 'od' },
+  ]
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions') ? { subscriptions }
+    : url.includes('provider=openai-codex') ? { status: 'ready', windows: [
+      { id: 'primary', windowMinutes: 300, remainingPercent: 30 },
+      { id: 'secondary', windowMinutes: 10080, remainingPercent: 40 }] }
+    : url.includes('provider=opencode-go') ? { status: 'ready', windows: [
+      { id: 'rolling', windowMinutes: 300, remainingPercent: 50 },
+      { id: 'weekly', windowMinutes: 10080, remainingPercent: 60 },
+      { id: 'monthly', windowMinutes: 43200, remainingPercent: 70 }] }
+    : { status: 'ready', plan: 'Design Plan Go', windows: [
+      { id: 'window-18000-0', label: '5 hours', windowMinutes: 300, remainingPercent: 80 },
+      { id: 'window-604800-1', label: '7 days', windowMinutes: 10080, remainingPercent: 90 }] }) })
+  ui.renderBalances(); ui.effects[0]()
+  await tick()
+  const nodes = elements(ui.renderBalances())
+  const titles = nodes.map(node => node.children?.[0]).filter(value => typeof value === 'string')
+  for (const expected of ['5小时', '1周', '1月']) {
+    assert.ok(titles.includes(expected), 'missing ' + expected + ' in ' + JSON.stringify(titles))
+  }
+  for (const vendor of ['5 hours', '7 days', 'Primary', 'Secondary', '5 小时', '每周']) {
+    assert.equal(titles.includes(vendor), false, 'vendor label ' + vendor + ' must not reach the card')
+  }
+  ui.dispose()
+})
+
 test('OpenDesign subscription shows both windows and wallet without dropping Codex or Zen', async () => {
   const subscriptions = [
     { providerId: 'openai-codex', cacheKey: 'codex-fixture' }, { providerId: 'opencode-go', cacheKey: 'go-fixture' },
     { providerId: 'opencode', cacheKey: 'zen-fixture', kind: 'balance' }, { providerId: 'opendesign', label: 'OpenDesign', cacheKey: 'od-fixture' },
   ]
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions') ? { subscriptions } : url.includes('provider=opendesign')
-    ? { status: 'ready', plan: 'Design Plan Go', warning: '套餐补充接口暂不可用', balance: { amount: 2.5, currency: 'USD' }, windows: [{ id: 'window-18000-0', label: '5 hours', remainingPercent: 65 }] }
+    ? { status: 'ready', plan: 'Design Plan Go', warning: '套餐补充接口暂不可用', balance: { amount: 2.5, currency: 'USD' }, windows: [{ id: 'window-18000-0', label: '5 hours', windowMinutes: 300, remainingPercent: 65 }] }
     : url.includes('provider=opencode&') || url.endsWith('provider=opencode') ? { status: 'ready', balance: { amount: 1, currency: 'USD' }, windows: [] }
     : { status: 'ready', windows: [{ id: 'weekly', remainingPercent: 90 }] }) })
   ui.renderBalances(); ui.effects[0]()
