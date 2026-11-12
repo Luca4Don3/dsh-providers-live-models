@@ -37,8 +37,27 @@ test('the eco Flash variant declares the same reasoning control as the standard 
   assert.deepEqual(eco.thinkingLevelMap, standard.thinkingLevelMap,
     'same weights and documented capabilities, so the same low/high/max control')
   assert.deepEqual(eco.thinkingLevels, ['low', 'high', 'max'], 'the opt-in set is recorded for diagnostics')
-  // The catalog still lists text only; do not invent image support from a probe.
-  assert.deepEqual(eco.input, ['text'])
+  // The catalog under-reports image input; OpenDesign asked for a local declaration.
+  // This fixture reports no architecture at all, so only eco is widened.
+  assert.deepEqual(eco.input, ['text', 'image'])
+  assert.deepEqual(standard.input, ['text'], 'a model without a correction is left alone')
+})
+
+test('a local modality correction only ever adds, and never overrides explicit input', () => {
+  // A model the table does not name keeps exactly what the catalog reported.
+  const plain = normalize({ data: [row('deepseek-v4.1-flash'), row('mimo-v2.6-flash')] })
+  assert.deepEqual(plain.models[0].input, ['text'], 'the catalog value is untouched')
+  assert.deepEqual(plain.models[1].input, ['text'])
+
+  // An explicit override still wins over both the catalog and the correction.
+  const overridden = normalize({ data: [row('deepseek-v4.1-flash-eco')] },
+    { overrides: { 'deepseek-v4.1-flash-eco': { input: ['text'] } } })
+  assert.deepEqual(overridden.models[0].input, ['text'], 'explicit input is not widened')
+
+  // The correction never narrows: a catalog that already lists image keeps it.
+  const already = normalize({ data: [{ ...row('deepseek-v4.1-flash-eco'),
+    architecture: { input_modalities: ['text', 'image'] } }] })
+  assert.deepEqual(already.models[0].input, ['text', 'image'], 'no duplicate and no loss')
 })
 
 test('known models declare the reasoning levels they accept', () => {
