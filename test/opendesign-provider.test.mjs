@@ -439,6 +439,8 @@ const VERIFIED = [
   ['0.2.2-alpha.2', '1.3.0'],
   ['0.2.2-alpha.3', '1.3.0'],
   ['0.2.2-rc.1', '1.3.0'],
+  ['0.2.2-rc.2', '1.3.0'],
+  ['0.2.2-rc.3', '1.3.0'],
   // Ahead of any DSH release: accepted only because it passes this same check.
   ['0.2.2-rc.1', '1.5.0'],
 ]

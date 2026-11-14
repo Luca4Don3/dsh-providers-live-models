@@ -28,7 +28,7 @@ CLI:
 dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
-Requires DSH 0.1.5-rc.1 or newer. OpenDesign accepts DSH 0.2.x with the explicitly verified pi-ai 1.1.x or 1.3.x compatibility lines. The shipped pairings 0.2.1-rc.5 with patched pi-ai 1.1.0, and 0.2.2-alpha.2 / 0.2.2-alpha.3 / 0.2.2-rc.1 with patched pi-ai 1.3.0, all pass the offline host smoke tests. pi-ai 1.5.0 is also accepted because it passes the same test against the 0.2.2-rc.1 adapter, ahead of any release that ships it. Unverified pi-ai lines are refused, and the actual adapter and transport methods are checked before registration. A mismatch disables only OpenDesign. The host needs GitHub access for the `github:` spec.
+Requires DSH 0.1.5-rc.1 or newer. OpenDesign accepts DSH 0.2.x with the explicitly verified pi-ai 1.1.x or 1.3.x compatibility lines. The shipped pairings 0.2.1-rc.5 with patched pi-ai 1.1.0, and 0.2.2-alpha.2 / 0.2.2-alpha.3 / 0.2.2-rc.1 / 0.2.2-rc.2 / 0.2.2-rc.3 with patched pi-ai 1.3.0, all pass the offline host smoke tests. pi-ai 1.5.0 is also accepted because it passes the same test against the 0.2.2-rc.1 adapter, ahead of any release that ships it. Unverified pi-ai lines are refused, and the actual adapter and transport methods are checked before registration. A mismatch disables only OpenDesign. The host needs GitHub access for the `github:` spec.
 
 ## Use
 

@@ -28,7 +28,7 @@ CLI：
 dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
-需要 DSH 0.1.5-rc.1+。OpenDesign 接受 DSH 0.2.x 搭配明确验证过的 pi-ai 1.1.x 或 1.3.x。已发布的组合全部通过离线宿主烟测：0.2.1-rc.5 配官方补丁版 pi-ai 1.1.0，0.2.2-alpha.2 / alpha.3 / rc.1 配官方补丁版 pi-ai 1.3.0。pi-ai 1.5.0 虽尚未随任何发行版发布，但配 0.2.2-rc.1 适配器通过了同一套测试，因此也放行。未验证的 pi-ai 版本线仍拒绝，注册前还会核对实际适配器及传输方法。不匹配时只停用 OpenDesign。`github:` spec 需要宿主机能访问 GitHub。
+需要 DSH 0.1.5-rc.1+。OpenDesign 接受 DSH 0.2.x 搭配明确验证过的 pi-ai 1.1.x 或 1.3.x。已发布的组合全部通过离线宿主烟测：0.2.1-rc.5 配官方补丁版 pi-ai 1.1.0，0.2.2-alpha.2 / alpha.3 / rc.1 / rc.2 / rc.3 配官方补丁版 pi-ai 1.3.0。pi-ai 1.5.0 虽尚未随任何发行版发布，但配 0.2.2-rc.1 适配器通过了同一套测试，因此也放行。未验证的 pi-ai 版本线仍拒绝，注册前还会核对实际适配器及传输方法。不匹配时只停用 OpenDesign。`github:` spec 需要宿主机能访问 GitHub。
 
 ## 使用
 
