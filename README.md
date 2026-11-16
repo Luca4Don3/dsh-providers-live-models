@@ -55,6 +55,8 @@ config:
 
 `stripTemperature` is only for OpenDesign gateways that reject `temperature`. `quotaSource` accepts `auto`, `vela` or `control`.
 
+Each OpenDesign model's request budget comes from its own roster `output_budget` (128000 for the DeepSeek V4.1 Flash line, 32000 for GLM, MiMo and Hy). Set `openDesign.outputTokenBudget` to cap every model at one number, or `openDesign.modelOverrides[id].maxTokens` for a single model. A model the roster says nothing about falls back to 8192. See [request budget](docs/opendesign.md#request-budget).
+
 OpenDesign retries `MALFORMED_RESPONSE` in addition to the host default set. Since
 DSH 0.2.2 a single unusable tool-arguments string fails the whole assistant turn
 before any tool runs, and the host default does not repeat that code. A gateway
