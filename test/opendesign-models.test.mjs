@@ -13,7 +13,8 @@ test('roster maps only trusted protocol, origin and supported modalities', () =>
   assert.equal(model.baseUrl, OPENDESIGN_BASE_URL); assert.deepEqual(model.input, ['text', 'image'])
   assert.equal(model.name, 'Display'); assert.equal(model.maxTokens, 8192)
   assert.equal(model.reasoning, undefined); assert.equal(model.headers, undefined)
-  assert.deepEqual(diagnostics, [{ id: 'model', outputBudgetSource: 'local-default', ignoredContextBudget: 32000 }])
+  assert.deepEqual(diagnostics, [{ id: 'model', outputBudgetSource: 'local-default', maxTokens: 8192,
+    ignoredContextBudget: 32000 }])
   assert.equal(Object.isFrozen(model.input), true)
   assert.throws(() => { model.input.push('file') }, TypeError)
 })
@@ -96,10 +97,50 @@ test('output request budget is independent of undocumented context_budget', () =
   assert.equal(diagnostics[0].outputBudgetSource, 'local-config')
   assert.equal(diagnostics[1].explicitOutputLimit, 1000)
 })
-test('output_budget is informational and never overrides the local request budget', () => {
-  const result = normalize({ data: [row('m', { output_budget: 1 })] })
-  assert.equal(result.models[0].maxTokens, 8192)
-  assert.equal(result.diagnostics[0].informationalOutputBudget, 1)
+
+test('each model follows its own roster output_budget instead of one global floor', () => {
+  // The roster states 128000 for the DeepSeek Flash line and 32000 for the rest;
+  // one global 8192 used to under-budget every one of them.
+  const { models, diagnostics } = normalize({ data: [
+    row('deepseek-v4.1-flash-eco', { output_budget: 128000 }),
+    row('deepseek-v4.1-flash', { output_budget: 128000 }),
+    row('glm-5.3-flash', { output_budget: 32000 }),
+  ] })
+  assert.deepEqual(models.map(model => model.maxTokens), [128000, 128000, 32000],
+    'the truncation that motivated this: an 8192-ceilinged request kept stopping the turn at the output limit')
+  assert.deepEqual(diagnostics.map(item => item.outputBudgetSource), ['catalog', 'catalog', 'catalog'])
+  assert.equal(diagnostics[0].catalogOutputBudget, 128000)
+})
+
+test('a model the roster says nothing about keeps the built-in floor', () => {
+  const { models, diagnostics } = normalize({ data: [row('m'), row('n', { output_budget: undefined })] })
+  assert.deepEqual(models.map(model => model.maxTokens), [8192, 8192])
+  assert.deepEqual(diagnostics.map(item => item.outputBudgetSource), ['local-default', 'local-default'])
+  assert.equal(diagnostics[0].catalogOutputBudget, undefined)
+})
+
+test('an unusable roster output_budget falls back instead of dropping the model', () => {
+  // Advisory field: 0, a negative number or a float must not reject a model that
+  // is otherwise usable, and must not become the budget either.
+  for (const output_budget of [0, -1, 1.5, '32000', Number.MAX_SAFE_INTEGER + 1]) {
+    const { models, diagnostics } = normalize({ data: [row('m', { output_budget })] })
+    assert.equal(models[0].maxTokens, 8192, 'output_budget=' + String(output_budget))
+    assert.equal(diagnostics[0].outputBudgetSource, 'local-default')
+  }
+})
+
+test('explicit override and deployment budget still outrank the roster value', () => {
+  const data = [row('m', { output_budget: 128000 })]
+  // Deployment-wide budget caps every model, including one that asks for more.
+  assert.equal(normalize({ data }, { outputTokenBudget: 32768 }).models[0].maxTokens, 32768)
+  assert.equal(normalize({ data }, { outputTokenBudget: 32768 }).diagnostics[0].outputBudgetSource, 'local-config')
+  // A per-model override outranks both and is not raised by the roster either.
+  const overridden = normalize({ data }, { outputTokenBudget: 32768, overrides: { m: { maxTokens: 8192 } } })
+  assert.equal(overridden.models[0].maxTokens, 8192)
+  assert.equal(overridden.diagnostics[0].outputBudgetSource, 'local-override')
+  // The context window still caps whatever the roster or the deployment asks for.
+  const narrow = normalize({ data: [{ ...row('m', { output_budget: 128000 }), metadata: { context_limit: 16000, output_budget: 128000 } }] })
+  assert.equal(narrow.models[0].maxTokens, 16000)
 })
 test('missing context is rejected individually and good entries survive', () => {
   const { models, diagnostics } = normalize({ data: [{ id: 'unknown' }, row('good'), row('good'),

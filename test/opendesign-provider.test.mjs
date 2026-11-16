@@ -170,6 +170,53 @@ test('stripTemperature is opt-in and removes only the temperature field on the w
 
 
 
+test('the wire request carries the roster per-model budget, not one global floor', async () => {
+  // End-to-end through the adapter: two roster rows with different output_budget
+  // values must reach the transport as different max_tokens values.
+  const wire = []
+  const api = { async *streamSimple(model, context, options) {
+    wire.push({ id: model.id, maxTokens: options.maxTokens })
+    await options.fetch(model.baseUrl + '/chat/completions', { method: 'POST',
+      headers: { authorization: 'Bearer ' + options.apiKey },
+      body: JSON.stringify({ model: model.id, max_tokens: options.maxTokens, messages: context.messages }) })
+    yield { type: 'text', text: 'ok' }
+  }, stream() { assert.fail('simple transport expected') } }
+  const roster = new Response(JSON.stringify({ data: [
+    { id: 'big', metadata: { context_limit: 1048000, output_budget: 128000 } },
+    { id: 'small', metadata: { context_limit: 1048000, output_budget: 32000 } },
+    { id: 'silent', metadata: { context_limit: 1048000 } },
+  ] }))
+  const fetchImpl = async url => url === MODELS ? roster.clone() : new Response('ok')
+  const f = await fixture({ api, fetchImpl })
+  for (const id of ['big', 'small', 'silent']) {
+    await collect(f.adapter.stream({ provider: 'opendesign', model: id, messages: [{ role: 'user', content: [] }] }))
+  }
+  assert.deepEqual(wire, [
+    { id: 'big', maxTokens: 128000 },
+    { id: 'small', maxTokens: 32000 },
+    { id: 'silent', maxTokens: 8192 },
+  ])
+  f.api.dispose()
+})
+
+test('a deployment outputTokenBudget still caps every roster value', async () => {
+  const wire = []
+  const api = { async *streamSimple(model, context, options) {
+    wire.push(options.maxTokens)
+    await options.fetch(model.baseUrl + '/chat/completions', { method: 'POST',
+      headers: { authorization: 'Bearer ' + options.apiKey },
+      body: JSON.stringify({ model: model.id, max_tokens: options.maxTokens, messages: context.messages }) })
+    yield { type: 'text', text: 'ok' }
+  }, stream() { assert.fail('simple transport expected') } }
+  const roster = new Response(JSON.stringify({ data: [
+    { id: 'big', metadata: { context_limit: 1048000, output_budget: 128000 } }] }))
+  const f = await fixture({ api, outputTokenBudget: 65536,
+    fetchImpl: async url => url === MODELS ? roster.clone() : new Response('ok') })
+  await collect(f.adapter.stream({ provider: 'opendesign', model: 'big', messages: [{ role: 'user', content: [] }] }))
+  assert.deepEqual(wire, [65536], 'the configured budget wins over the roster value')
+  f.api.dispose()
+})
+
 test('the roster load prunes stale preference ids once and survives a failing prune', async () => {
   let pruneCalls = 0, pruneArg = null
   const preferences = {

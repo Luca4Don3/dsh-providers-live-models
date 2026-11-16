@@ -48,7 +48,10 @@ against a real account here.
 - `metadata.context_limit` becomes the context window.
 - `metadata.context_budget` is **not** treated as an output cap; it is retained in
   diagnostics only.
-- `metadata.output_budget` is informational, not an enforced vendor limit.
+- `metadata.output_budget` sizes that model's request budget. It is not an
+  enforced vendor limit either: an explicit `outputTokenBudget` or a
+  `modelOverrides[id].maxTokens` outranks it, and the context window plus any
+  `max_output_tokens` capability still cap it.
 - Invalid descriptors are rejected individually; valid rows survive and the
   rejected count is shown in the detail page.
 - No static Go roster is presented as an account's entitlement.
@@ -91,9 +94,31 @@ envelope.
 
 ## Request budget
 
-`outputTokenBudget` (default 8192) is a **local request budget**, not a claim
-about the vendor's capability. An explicit caller cap is honoured up to that
-budget.
+Every model's `maxTokens` is a **local request budget**, not a claim about the
+vendor's capability; an explicit caller cap is honoured up to it.
+
+One budget per roster row, highest precedence first:
+
+| Rank | Source | When |
+| --- | --- | --- |
+| 1 | `modelOverrides[id].maxTokens` | The profile names this model |
+| 2 | `outputTokenBudget` | The profile names one deployment-wide budget |
+| 3 | `metadata.output_budget` | The roster states a value for this model |
+| 4 | 8192 | The roster says nothing usable |
+
+Rank 3 is why the floor is not simply 8192 everywhere. The roster states 128000
+for the DeepSeek V4.1 Flash line and 32000 for the GLM, MiMo and Hy models, and a
+single 8192 ceiling truncated long reasoning before any text or tool call
+appeared: DSH maps a transport `length` finish to `max-tokens`, which ends the
+turn and waits for the user to send another message. A model whose value is
+missing or unusable falls back rather than being dropped, because the field is
+advisory.
+
+Raising the budget also raises what compaction reserves out of the context
+window, so a budget large enough to shrink that window below its own pressure
+threshold makes compaction fire earlier. On a 1,048,000-token model with the
+default 65,536 headroom and 0.8 ratio, any budget up to about 144,064 leaves the
+threshold untouched.
 
 ## Why the launcher is never imported
 
@@ -172,6 +197,7 @@ config:
   openDesign:
     enabled: true
     protocol: chat-completions # or responses
+    # Optional. Omit it to follow each model's own roster output_budget.
     outputTokenBudget: 8192
     stripTemperature: false
 ```
