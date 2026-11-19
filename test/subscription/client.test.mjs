@@ -1471,6 +1471,25 @@ test('the signed-in OpenDesign card mirrors the other two sign-in cards', async 
   ui.dispose()
 })
 
+test('the three sign-in cards are titled by product and say 已登录', async () => {
+  const signedIn = { loggedIn: true, mode: 'account', models: { modelCount: 3, state: 'ready', protocol: 'chat-completions' } }
+  const ui = loadClient({ fetchImpl: async () => response(signedIn) })
+  for (let pass = 0; pass < 3; pass += 1) { ui.render(); ui.effects.forEach(effect => effect()); await tick() }
+  const nodes = elements(ui.render())
+  const headings = nodes.filter(node => node.type === 'strong').map(node => node.children?.[0] ?? node.props?.children)
+  for (const title of ['OpenAI', 'OpenCode', 'OpenDesign']) assert.ok(headings.includes(title), 'card titled ' + title)
+  // The vendor-qualified names and the old status word are gone.
+  const text = JSON.stringify(nodes.map(node => [node.props?.children, node.children]))
+  for (const gone of ['ChatGPT 登录', 'OpenCode Console 登录', 'OpenDesign Cloud', '账号已授权']) {
+    assert.ok(!text.includes(gone), 'no card still says ' + gone)
+  }
+  // Every card reports the same signed-in word, and each names its own product
+  // in the sentence below the title.
+  for (const sentence of ['已登录 OpenAI', '已登录 OpenCode', '已登录 OpenDesign']) {
+    assert.ok(text.includes(sentence), 'body copy keeps ' + sentence)
+  }
+  ui.dispose()
+})
 test('every sign-in card offers exactly re-login and logout when signed in', async () => {
   const signedIn = { loggedIn: true, mode: 'account', models: { modelCount: 3, state: 'ready', protocol: 'chat-completions' } }
   const ui = loadClient({ fetchImpl: async () => response(signedIn) })

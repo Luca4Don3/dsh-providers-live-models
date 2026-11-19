@@ -33,7 +33,7 @@ dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ## 使用
 
 1. 在 DSH 的 `llm-pi-ai` 中配置要用的路由。Codex 用原生 OAuth，Go 与 Zen 读取下面的 Key 引用。
-2. 打开**插件 → dsh-providers-live-models**：登录 ChatGPT、OpenCode Console 或 OpenDesign，在**模型展示**中开关模型，点**保存选择**生效。
+2. 打开**插件 → dsh-providers-live-models**：登录 OpenAI、OpenCode 或 OpenDesign，在**模型展示**中开关模型，点**保存选择**生效。三张登录卡以订阅方命名，标题右侧统一显示登录状态。
 3. 打开**设置 → 账号与余额**查看额度；点**刷新额度**强制查询。卡片会跨重启缓存，`freshMs` 默认 5 分钟。
 
 卡片按订阅方命名：OpenAI 在标题下显示套餐（如 GPT Plus），OpenCode 在标题下显示 Go 套餐。Go 与 Zen 都配置时只出现一张 OpenCode 卡：上线是 Go 的 5 小时 / 1 周 / 1 月额度，下线是 Zen 的钱包余额（Extra Usage 花的就是它）。只配置 Zen 时它单独成一张余额卡。套餐名读不到时留空，不猜。

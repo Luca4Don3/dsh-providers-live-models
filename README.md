@@ -33,7 +33,7 @@ Installs on DSH `>=0.2.1-rc.5 <0.3.0-0`: a new 0.2 patch or pre-release installs
 ## Use
 
 1. Configure the routes you use in DSH's `llm-pi-ai` providers. Codex uses native OAuth; Go and Zen read the key references below.
-2. Open **Plugins → dsh-providers-live-models**. Sign in to ChatGPT, OpenCode Console or OpenDesign, switch models under **Model display (模型展示)**, then **Save selection**.
+2. Open **Plugins → dsh-providers-live-models**. Sign in to OpenAI, OpenCode or OpenDesign, switch models under **Model display (模型展示)**, then **Save selection**. The three sign-in cards are named after the subscription, and the title's right side carries the sign-in state.
 3. Open **Settings → Account & balance** for usage. **Refresh usage** forces a query; cards are cached across restarts and `freshMs` defaults to five minutes.
 
 A card is named after the subscription, not the route: OpenAI shows its plan (for example GPT Plus) and OpenCode shows its Go plan under the title. With both Go and Zen configured there is one OpenCode card — Go's 5-hour / weekly / monthly limits above, Zen's wallet below, which is what Extra Usage spends. Zen configured alone keeps its own balance card. A plan name that cannot be read is left blank rather than guessed.
