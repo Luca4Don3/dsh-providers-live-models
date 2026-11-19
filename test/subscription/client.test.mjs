@@ -416,9 +416,10 @@ test('the OpenAI card offers one use button per reset ticket, and asks before sp
   assert.ok(nodes.some(node => node.children.includes('重置卡：2 张可用')))
   assert.equal(nodes.filter(node => node.props?.['data-reset-credit']).length, 2, 'one button per ticket')
   const button = nodes.find(node => node.props?.['data-reset-credit'] === 'openai-codex')
-  assert.ok(button.children.includes('使用重置卡'))
+  assert.ok(button.children.includes('重置'))
   button.props.onClick(); await tick()
-  assert.match(String(confirmed), /不可撤销/, 'the confirmation says it cannot be undone')
+  assert.ok(String(confirmed).includes('Full reset'), 'the confirmation names the ticket')
+  assert.equal(String(confirmed).includes('不可撤销'), false, 'the dialog is a yes/no gate, not a warning')
   const posted = calls.find(call => call.url.endsWith('/reset-credit'))
   assert.ok(posted, 'the click posts exactly once')
   const body = JSON.parse(posted.options.body)
@@ -455,7 +456,7 @@ test('a card without reset tickets shows no reset controls at all', async () => 
   ui.dispose()
 })
 
-test('a failed reset-credit read is reported without touching the quota numbers', async () => {
+test('a failed reset-credit read leaves the quota alone and adds no reset section', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
     : { status: 'ready', capturedAt: 10000, resetCredits: { available: 0, options: [], unavailable: 'risk-control' },
@@ -463,8 +464,10 @@ test('a failed reset-credit read is reported without touching the quota numbers'
   ui.renderBalances(); ui.effects[0](); await tick()
   const nodes = elements(ui.renderBalances())
   assert.ok(nodes.some(node => node.children.includes('剩余 50%')), 'quota survives')
-  assert.ok(nodes.some(node => node.children.some(child => typeof child === 'string' && child.includes('重置卡数量读取失败'))))
+  // With no tickets there is nothing to show: neither a button nor a note about
+  // the failed read, which would only repeat on every refresh.
   assert.equal(nodes.some(node => node.props?.['data-reset-credit']), false)
+  assert.equal(nodes.some(node => node.children.some(child => typeof child === 'string' && child.includes('重置卡'))), false)
   ui.dispose()
 })
 test('a billing rejection stays in the money row without claiming the key lacks permissions', async () => {
