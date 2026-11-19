@@ -13,9 +13,9 @@ It also adds compaction recovery: long histories are summarized in capacity-awar
 
 | Route | Catalog | Sign-in / credential | Usage |
 | --- | --- | --- | --- |
-| `opencode-go` | Pi + live Go roster | `OPENCODE_GO_API_KEY` | Go quota |
-| `opencode` (Zen) | Pi + live Zen roster | API key or Console device login | Zen balance |
-| `openai-codex` | Pi public catalog | native ChatGPT OAuth | OpenAI subscription |
+| `opencode-go` | Pi + live Go roster | `OPENCODE_GO_API_KEY` | Go plan (Go Plan / Go Plus / Go Teams) and its three limits |
+| `opencode` (Zen) | Pi + live Zen roster | API key or Console device login | Zen wallet, shown in the same card as Go |
+| `openai-codex` | Pi public catalog | native ChatGPT OAuth | OpenAI subscription with its plan name (for example GPT Plus) |
 | `opendesign` (prerelease) | account catalog | API key or device authorization | quota and wallet in account mode |
 
 ## Install
@@ -28,13 +28,15 @@ CLI:
 dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
-Requires DSH 0.1.5-rc.1 or newer. OpenDesign accepts DSH 0.2.x with the explicitly verified pi-ai 1.1.x or 1.3.x compatibility lines. The shipped pairings 0.2.1-rc.5 with patched pi-ai 1.1.0, and 0.2.2-alpha.2 / 0.2.2-alpha.3 / 0.2.2-rc.1 / 0.2.2-rc.2 / 0.2.2-rc.3 with patched pi-ai 1.3.0, all pass the offline host smoke tests. pi-ai 1.5.0 is also accepted because it passes the same test against the 0.2.2-rc.1 adapter, ahead of any release that ships it. Unverified pi-ai lines are refused, and the actual adapter and transport methods are checked before registration. A mismatch disables only OpenDesign. The host needs GitHub access for the `github:` spec.
+Installs on DSH `>=0.2.1-rc.5 <0.3.0-0`: a new 0.2 patch or pre-release installs directly, while 0.3.0 and every 0.3 pre-release waits until the adapter is re-checked. OpenDesign additionally accepts DSH 0.2.x with the explicitly verified pi-ai 1.1.x or 1.3.x compatibility lines. The shipped pairings 0.2.1-rc.5 with patched pi-ai 1.1.0, and 0.2.2-alpha.2 / 0.2.2-alpha.3 / 0.2.2-rc.1 / 0.2.2-rc.2 / 0.2.2-rc.3 / 0.2.2-rc.4 / 0.2.2-rc.5 with patched pi-ai 1.3.0, all pass the offline host smoke tests. pi-ai 1.5.0 is also accepted because it passes the same test against the 0.2.2-rc.1 adapter, ahead of any release that ships it. Unverified pi-ai lines are refused, and the actual adapter and transport methods are checked before registration. A mismatch disables only OpenDesign. The host needs GitHub access for the `github:` spec.
 
 ## Use
 
 1. Configure the routes you use in DSH's `llm-pi-ai` providers. Codex uses native OAuth; Go and Zen read the key references below.
 2. Open **Plugins → dsh-providers-live-models**. Sign in to ChatGPT, OpenCode Console or OpenDesign, switch models under **Model display (模型展示)**, then **Save selection**.
 3. Open **Settings → Account & balance** for usage. **Refresh usage** forces a query; cards are cached across restarts and `freshMs` defaults to five minutes.
+
+A card is named after the subscription, not the route: OpenAI shows its plan (for example GPT Plus) and OpenCode shows its Go plan under the title. With both Go and Zen configured there is one OpenCode card — Go's 5-hour / weekly / monthly limits above, Zen's wallet below, which is what Extra Usage spends. Zen configured alone keeps its own balance card. A plan name that cannot be read is left blank rather than guessed.
 
 All sign-ins write only the plugin's own credential records; model API keys and Codex OAuth are not overwritten.
 

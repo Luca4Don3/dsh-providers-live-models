@@ -63,6 +63,55 @@ test('Codex configuration discovery reads credential metadata without refreshing
   assert.equal(await createCodexAdapter({}).isConfigured(), false)
 })
 
+test('Go names its plan from the Console product only when a Console session exists', async () => {
+  const seen = []
+  const consoleAuth = {
+    isConfigured: async () => true,
+    async resolveAuth() { return { authorization: 'Bearer <oauth-token>', orgId: 'org_fixture' } },
+  }
+  const adapter = createOpenCodeGoAdapter({ credentials: { resolve: async () => ({ value: '<go-key>' }) }, consoleAuth,
+    fetchImpl: async (url, options) => {
+      seen.push(url)
+      if (url === 'https://opencode.ai/console/api/go/status') {
+        assert.equal(options.headers.authorization, 'Bearer <oauth-token>', 'the key is refused on Console routes')
+        assert.equal(options.headers['x-org-id'], 'org_fixture')
+        return Response.json({ product: 'go-plus' })
+      }
+      assert.equal(options.headers.authorization, 'Bearer <go-key>')
+      return Response.json({ usage: { rolling: { status: 'ok', percent: 5, resetsAt: '2026-11-19T05:15:04.000Z' } } })
+    } })
+  const snapshot = adapter.normalize(await adapter.fetchUsage(await adapter.resolveAuth()), { capturedAt: 1 })
+  assert.deepEqual(seen, ['https://opencode.ai/zen/go/v1/usage', 'https://opencode.ai/console/api/go/status'])
+  assert.equal(snapshot.plan, 'go-plus')
+})
+
+test('without a Console session the Go limits still load and the plan stays unnamed', async () => {
+  const seen = []
+  const adapter = createOpenCodeGoAdapter({ credentials: { resolve: async () => ({ value: '<go-key>' }) },
+    fetchImpl: async url => { seen.push(url); return Response.json({ usage: { weekly: { status: 'ok', percent: 9, resetsAt: '2026-11-23T00:00:00.000Z' } } }) } })
+  const snapshot = adapter.normalize(await adapter.fetchUsage(await adapter.resolveAuth()), { capturedAt: 1 })
+  assert.deepEqual(seen, ['https://opencode.ai/zen/go/v1/usage'], 'no plan probe without a session')
+  assert.equal(snapshot.plan, undefined)
+  assert.equal(snapshot.windows.length, 1, 'the limits are unaffected')
+})
+
+test('a failing plan probe never costs the Go limits', async () => {
+  const consoleAuth = { isConfigured: async () => true,
+    async resolveAuth() { return { authorization: 'Bearer <oauth-token>', orgId: 'org_fixture' } } }
+  for (const failure of [
+    async () => Response.json({ private: '<token>' }, { status: 403 }),
+    async () => { throw Object.assign(new Error('expired'), { code: 'auth-required' }) },
+    async () => Response.json({}, { status: 200 }),
+  ]) {
+    const adapter = createOpenCodeGoAdapter({ credentials: { resolve: async () => ({ value: '<go-key>' }) }, consoleAuth,
+      fetchImpl: async url => url.endsWith('/v1/usage')
+        ? Response.json({ usage: { monthly: { status: 'ok', percent: 40, resetsAt: '2026-12-10T06:22:49.000Z' } } })
+        : failure() })
+    const snapshot = adapter.normalize(await adapter.fetchUsage(await adapter.resolveAuth()), { capturedAt: 1 })
+    assert.equal(snapshot.windows.length, 1, 'the limits survive a plan failure')
+    assert.equal(snapshot.plan, undefined, 'no invented plan name')
+  }
+})
 test('Go configuration discovery requires a non-empty key in the configured reference', async () => {
   let value
   const adapter = createOpenCodeGoAdapter({

@@ -13,9 +13,9 @@
 
 | 路由 | 目录 | 登录 / 凭据 | 额度 |
 | --- | --- | --- | --- |
-| `opencode-go` | Pi + Go 实时名单 | `OPENCODE_GO_API_KEY` | Go 额度 |
-| `opencode`（Zen） | Pi + Zen 实时名单 | API Key 或 Console 设备登录 | Zen 余额 |
-| `openai-codex` | Pi 公开目录 | 原生 ChatGPT OAuth | OpenAI 订阅 |
+| `opencode-go` | Pi + Go 实时名单 | `OPENCODE_GO_API_KEY` | Go 套餐（Go Plan / Go Plus / Go Teams）与三项额度 |
+| `opencode`（Zen） | Pi + Zen 实时名单 | API Key 或 Console 设备登录 | Zen 钱包余额，与 Go 同卡显示 |
+| `openai-codex` | Pi 公开目录 | 原生 ChatGPT OAuth | OpenAI 订阅与套餐名（如 GPT Plus） |
 | `opendesign`（预发布） | 账号目录 | API Key 或设备授权 | 账号模式显示额度与钱包 |
 
 ## 安装
@@ -28,13 +28,15 @@ CLI：
 dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 ```
 
-需要 DSH 0.1.5-rc.1+。OpenDesign 接受 DSH 0.2.x 搭配明确验证过的 pi-ai 1.1.x 或 1.3.x。已发布的组合全部通过离线宿主烟测：0.2.1-rc.5 配官方补丁版 pi-ai 1.1.0，0.2.2-alpha.2 / alpha.3 / rc.1 / rc.2 / rc.3 配官方补丁版 pi-ai 1.3.0。pi-ai 1.5.0 虽尚未随任何发行版发布，但配 0.2.2-rc.1 适配器通过了同一套测试，因此也放行。未验证的 pi-ai 版本线仍拒绝，注册前还会核对实际适配器及传输方法。不匹配时只停用 OpenDesign。`github:` spec 需要宿主机能访问 GitHub。
+安装门槛是 DSH `>=0.2.1-rc.5 <0.3.0-0`：0.2 线上新的补丁版和预发布版可直接安装，0.3.0 及其所有预发布版则要等适配器重新核对后才放行。OpenDesign 还要求 DSH 0.2.x 搭配明确验证过的 pi-ai 1.1.x 或 1.3.x。已发布的组合全部通过离线宿主烟测：0.2.1-rc.5 配官方补丁版 pi-ai 1.1.0，0.2.2-alpha.2 / alpha.3 / rc.1 / rc.2 / rc.3 / rc.4 / rc.5 配官方补丁版 pi-ai 1.3.0。pi-ai 1.5.0 虽尚未随任何发行版发布，但配 0.2.2-rc.1 适配器通过了同一套测试，因此也放行。未验证的 pi-ai 版本线仍拒绝，注册前还会核对实际适配器及传输方法。不匹配时只停用 OpenDesign。`github:` spec 需要宿主机能访问 GitHub。
 
 ## 使用
 
 1. 在 DSH 的 `llm-pi-ai` 中配置要用的路由。Codex 用原生 OAuth，Go 与 Zen 读取下面的 Key 引用。
 2. 打开**插件 → dsh-providers-live-models**：登录 ChatGPT、OpenCode Console 或 OpenDesign，在**模型展示**中开关模型，点**保存选择**生效。
 3. 打开**设置 → 账号与余额**查看额度；点**刷新额度**强制查询。卡片会跨重启缓存，`freshMs` 默认 5 分钟。
+
+卡片按订阅方命名：OpenAI 在标题下显示套餐（如 GPT Plus），OpenCode 在标题下显示 Go 套餐。Go 与 Zen 都配置时只出现一张 OpenCode 卡：上线是 Go 的 5 小时 / 1 周 / 1 月额度，下线是 Zen 的钱包余额（Extra Usage 花的就是它）。只配置 Zen 时它单独成一张余额卡。套餐名读不到时留空，不猜。
 
 所有登录只写插件自己的凭据记录，不改写模型 API Key 或 Codex OAuth。
 

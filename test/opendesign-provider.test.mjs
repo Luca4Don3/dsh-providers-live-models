@@ -488,6 +488,8 @@ const VERIFIED = [
   ['0.2.2-rc.1', '1.3.0'],
   ['0.2.2-rc.2', '1.3.0'],
   ['0.2.2-rc.3', '1.3.0'],
+  ['0.2.2-rc.4', '1.3.0'],
+  ['0.2.2-rc.5', '1.3.0'],  // smoke-tested against the real rc.5 host, not inferred
   // Ahead of any DSH release: accepted only because it passes this same check.
   ['0.2.2-rc.1', '1.5.0'],
 ]

@@ -14,7 +14,11 @@
 | `@deepseek-ai/dsh-llm-pi-ai@0.2.2-rc.5` | `1.3.0` (patched) | PASS |
 | `@deepseek-ai/dsh-llm-pi-ai@0.2.2-rc.1` | `1.5.0` (unpatched, ahead of release) | PASS |
 
+`0.2.2-rc.4` and `0.2.2-rc.5` were smoke-tested against the real published packages, not inferred from rc.3: `scripts/verify-opendesign-host.mjs` passes for both protocols plus the overlay check on rc.5, and `adapter.ts` is byte-identical across rc.3 and rc.5 (`f3f9ac00`).
+
 The gate accepts DSH 0.2.x and **only** the verified pi-ai 1.1.x / 1.3.x lines, plus 1.5.0 which passes the same smoke test against the 0.2.2-rc.1 adapter ahead of any release shipping it. It does not permit arbitrary pi-ai 1.x releases. Malformed versions, missing adapter/transport methods and unproven package ownership are rejected before route registration. It always uses the host-owned package rather than a profile peer.
+
+`engines.dsh` is `>=0.2.1-rc.5 <0.3.0-0`, matching how the runtime gate treats the 0.2 line: a new 0.2.x patch or pre-release installs without a plugin release, while 0.3.0 and every 0.3 pre-release is refused until the adapter is re-checked against its actual surface. The upper bound is `<0.3.0-0` rather than `<0.3.0` so a 0.3.0 pre-release cannot slip in under SemVer's prerelease ordering.
 
 ## What was exercised
 

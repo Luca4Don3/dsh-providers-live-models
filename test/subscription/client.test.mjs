@@ -310,7 +310,7 @@ test('startup wrappers follow late native registration, survive HMR and restore 
   assert.equal(overlay.component, original)
 })
 
-test('Zen balances use the bottom full-width row after both subscription cards, with their own footer', async () => {
+test('Zen money joins the Go card so one account shows plan, limits and wallet together', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions') ? { subscriptions: [
     { providerId: 'opencode', label: 'OpenCode Zen', kind: 'balance', cacheKey: 'zen' },
     { providerId: 'openai-codex', cacheKey: 'codex' },
@@ -320,20 +320,83 @@ test('Zen balances use the bottom full-width row after both subscription cards, 
     : { status: 'ready', windows: [{ id: 'primary', remainingPercent: 80 }] }) })
   ui.renderBalances(); ui.effects[0](); await tick()
   const tree = ui.renderBalances(), nodes = elements(tree)
-  const balanceRow = tree.children.at(-1)
-  assert.equal(balanceRow.props['aria-label'], '账户余额')
-  assert.equal(balanceRow.props.style.gridTemplateColumns, '1fr')
-  assert.equal(balanceRow.props.style.marginTop, 20)
-  const card = nodes.find(node => node.props?.['data-balance'] === 'opencode')
-  assert.ok(card)
-  assert.ok(elements(card).some(node => node.children.includes('OpenCode Zen 余额')))
-  assert.ok(elements(card).some(node => node.children.some(child => typeof child === 'string' && /USD.*12\.34/.test(child))))
-  assert.equal(card.children.at(-1).type, 'footer')
+  // No bottom money row is left: the wallet lives inside the card it belongs to.
+  assert.equal(nodes.some(node => node.props?.['data-balance']), false)
+  assert.equal(tree.children.at(-1)?.props?.style?.gridTemplateColumns === '1fr', false)
+  const card = nodes.find(node => node.props?.['data-subscription'] === 'opencode-go')
+  assert.ok(card, 'the Go card carries the merged money')
+  assert.ok(elements(card).some(node => node.children.some(child => typeof child === 'string' && /12\.34/.test(child))))
+  assert.ok(elements(card).some(node => node.children.some(child => typeof child === 'string' && child.startsWith('Zen 钱包余额：'))))
   const order = nodes.filter(node => node.props?.['data-subscription'] || node.props?.['data-balance'])
     .map(node => node.props['data-subscription'] ?? node.props['data-balance'])
-  assert.deepEqual(order, ['openai-codex', 'opencode-go', 'opencode'])
+  assert.deepEqual(order, ['openai-codex', 'opencode-go'])
 })
 
+test('a configured Go plan is named under the OpenCode title, and an unknown id is left unnamed', async () => {
+  for (const [plan, title] of [['go', 'Go Plan'], ['go-plus', 'Go Plus'], ['go-teams', 'Go Teams'],["enterprise-ultra", undefined]]) {
+    const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+      ? { subscriptions: [{ providerId: 'opencode-go', label: 'OpenCode Go', cacheKey: 'go' }] }
+      : { status: 'ready', windows: [], plan, capturedAt: 10000 }) })
+    ui.renderBalances(); ui.effects[0](); await tick()
+    const nodes = elements(ui.renderBalances())
+    assert.ok(nodes.some(node => node.children.includes('OpenCode')), 'the card names the account, not the channel')
+    assert.equal(nodes.some(node => node.children.includes('OpenCode Go')), false, 'the channel id is not the card title')
+    if (title === undefined) assert.equal(nodes.some(node => node.props?.['data-plan']), false, 'an unknown plan id stays unnamed')
+    else assert.ok(nodes.some(node => node.children.includes(title)), plan + ' must render as ' + title)
+    ui.dispose()
+  }
+})
+
+test('OpenAI names its plan from the reported plan_type, including tiers this account does not have', async () => {
+  for (const [planType, title] of [['plus', 'GPT Plus'], ['pro', 'GPT Pro'], ['team', 'GPT Team'], ['free', 'ChatGPT Free'],
+    ['enterprise', 'GPT Enterprise'], ['unknown', undefined], ['mystery-tier', undefined]]) {
+    const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+      ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
+      : { status: 'ready', plan: planType, windows: [{ id: 'primary', remainingPercent: 50 }], capturedAt: 10000 }) })
+    ui.renderBalances(); ui.effects[0](); await tick()
+    const nodes = elements(ui.renderBalances())
+    assert.ok(nodes.some(node => node.children.includes('OpenAI')))
+    if (title === undefined) assert.equal(nodes.some(node => node.props?.['data-plan']), false)
+    else assert.ok(nodes.some(node => node.children.includes(title)), planType + ' must render as ' + title)
+    ui.dispose()
+  }
+})
+
+test('a plan line survives the display cache so a restart does not blank it', async () => {
+  const storage = memoryStorage()
+  const subscriptions = [{ providerId: 'opencode-go', label: 'OpenCode Go', cacheKey: 'go' }]
+  const first = loadClient({ storage, now: () => 10000, fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions } : { status: 'ready', windows: [], plan: 'go-teams', capturedAt: 10000 }) })
+  first.renderBalances(); first.effects[0](); await tick(); first.dispose()
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY)).entries[0].snapshot.plan, 'go-teams')
+  const restarted = loadClient({ storage, now: () => 1000000, fetchImpl: async () => new Promise(() => {}) })
+  assert.ok(elements(restarted.renderBalances()).some(node => node.children.includes('Go Teams')), 'the cached plan is named before any refresh')
+  restarted.dispose()
+})
+test('with only Zen there is one Zen balance card and no Go card, and with only Go there is no wallet line', async () => {
+  // Only Zen: the wallet keeps its own card, named after the provider.
+  const zenOnly = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'opencode', label: 'OpenCode Zen', kind: 'balance', cacheKey: 'zen' }] }
+    : { status: 'ready', windows: [], balance: { amount: 7.5, currency: 'USD' }, capturedAt: 10000 }) })
+  zenOnly.renderBalances(); zenOnly.effects[0](); await tick()
+  const zenNodes = elements(zenOnly.renderBalances())
+  assert.deepEqual(zenNodes.filter(node => node.props?.['data-balance'] || node.props?.['data-subscription'])
+    .map(node => node.props['data-balance'] ?? node.props['data-subscription']), ['opencode'], 'a lone Zen keeps one money card')
+  assert.ok(zenNodes.some(node => node.children.includes('OpenCode Zen 余额')))
+  zenOnly.dispose()
+
+  // Only Go: no wallet line, because there is no Zen wallet to merge in.
+  const goOnly = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'opencode-go', label: 'OpenCode Go', cacheKey: 'go' }] }
+    : { status: 'ready', plan: 'go', windows: [{ id: 'weekly', windowMinutes: 10080, remainingPercent: 88 }], capturedAt: 10000 }) })
+  goOnly.renderBalances(); goOnly.effects[0](); await tick()
+  const goNodes = elements(goOnly.renderBalances())
+  assert.deepEqual(goNodes.filter(node => node.props?.['data-balance'] || node.props?.['data-subscription'])
+    .map(node => node.props['data-balance'] ?? node.props['data-subscription']), ['opencode-go'], 'a lone Go keeps one card')
+  assert.ok(goNodes.some(node => node.children.includes('Go Plan')))
+  assert.equal(goNodes.some(node => node.children.some(child => typeof child === 'string' && child.includes('钱包余额：'))), false, 'no wallet without Zen')
+  goOnly.dispose()
+})
 test('a billing rejection stays in the money row without claiming the key lacks permissions', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions: [{ providerId: 'opencode', label: 'OpenCode Zen', kind: 'balance', cacheKey: 'zen' }] }
@@ -532,7 +595,7 @@ test('account page queries only configured subscriptions and refreshes their rem
   assert.deepEqual(calls, ['/dsh-providers-live-models/subscriptions', '/dsh-providers-live-models/usage?provider=openai-codex'])
   const nodes = elements(ui.renderBalances())
   assert.ok(nodes.some(node => node.children.includes('剩余 75%')))
-  assert.ok(nodes.some(node => node.children.includes('OpenAI订阅')))
+  assert.ok(nodes.some(node => node.children.includes('OpenAI')))
   assert.ok(!nodes.some(node => node.children.includes('OpenAI Codex')))
   assert.ok(nodes.some(node => node.children.includes('5小时')))
   assert.ok(nodes.some(node => node.children.includes('1周')))
@@ -559,7 +622,7 @@ test('account page keeps the original subscriptions plus OpenDesign and displays
   ui.effects[0]()
   await tick()
   const cards = elements(ui.renderBalances()).filter(node => node.props?.['data-subscription'])
-  assert.deepEqual(cards.map(node => node.props['data-subscription']), ['openai-codex', 'opencode-go', 'opencode', 'opendesign'])
+  assert.deepEqual(cards.map(node => node.props['data-subscription']), ['openai-codex', 'opencode-go', 'opendesign'])
   assert.equal(calls.length, 5, 'one list request and at most four usage requests')
 })
 
@@ -1011,7 +1074,7 @@ test('every provider names a limit window by its length, not by its vendor label
   ui.dispose()
 })
 
-test('OpenDesign subscription shows both windows and wallet without dropping Codex or Zen', async () => {
+test('OpenDesign subscription shows both windows and wallet without dropping Codex or the Zen wallet', async () => {
   const subscriptions = [
     { providerId: 'openai-codex', cacheKey: 'codex-fixture' }, { providerId: 'opencode-go', cacheKey: 'go-fixture' },
     { providerId: 'opencode', cacheKey: 'zen-fixture', kind: 'balance' }, { providerId: 'opendesign', label: 'OpenDesign', cacheKey: 'od-fixture' },
@@ -1023,7 +1086,11 @@ test('OpenDesign subscription shows both windows and wallet without dropping Cod
   ui.renderBalances(); ui.effects[0]()
   await tick()
   const tree = ui.renderBalances(), nodes = elements(tree)
-  for (const id of subscriptions.map(value => value.providerId)) assert.ok(nodes.some(node => (node.props?.['data-subscription'] ?? node.props?.['data-balance']) === id), id)
+  // Zen reports through the Go card, so its money must still be on the page.
+  const cards = nodes.filter(node => node.props?.['data-subscription'] || node.props?.['data-balance'])
+  assert.deepEqual(cards.map(node => node.props['data-subscription'] ?? node.props['data-balance']), ['openai-codex', 'opencode-go', 'opendesign'])
+  assert.ok(elements(nodes.find(node => node.props?.['data-subscription'] === 'opencode-go'))
+    .some(node => node.children.some(value => typeof value === 'string' && value.startsWith('Zen 钱包余额：'))), 'Zen money survives the merge and still names Zen')
   const card = nodes.find(node => node.props?.['data-subscription'] === 'opendesign')
   assert.ok(elements(card).some(node => node.children.includes('剩余 65%')))
   assert.ok(elements(card).some(node => node.children.some(value => typeof value === 'string' && value.includes('钱包余额：'))))
