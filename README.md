@@ -15,7 +15,7 @@ It also adds compaction recovery: long histories are summarized in capacity-awar
 | --- | --- | --- | --- |
 | `opencode-go` | Pi + live Go roster | `OPENCODE_GO_API_KEY` | Go plan (Go Plan / Go Plus / Go Teams) and its three limits |
 | `opencode` (Zen) | Pi + live Zen roster | API key or Console device login | Zen wallet, shown in the same card as Go |
-| `openai-codex` | Pi public catalog | native ChatGPT OAuth | OpenAI subscription with its plan name (for example GPT Plus) |
+| `openai-codex` | Pi public catalog | native ChatGPT OAuth | OpenAI subscription, plan name (for example GPT Plus), and reset credits |
 | `opendesign` (prerelease) | account catalog | API key or device authorization | quota and wallet in account mode |
 
 ## Install
@@ -37,6 +37,8 @@ Installs on DSH `>=0.2.1-rc.5 <0.3.0-0`: a new 0.2 patch or pre-release installs
 3. Open **Settings → Account & balance** for usage. **Refresh usage** forces a query; cards are cached across restarts and `freshMs` defaults to five minutes.
 
 A card is named after the subscription, not the route: OpenAI shows its plan (for example GPT Plus) and OpenCode shows its Go plan under the title. With both Go and Zen configured there is one OpenCode card — Go's 5-hour / weekly / monthly limits above, Zen's wallet below, which is what Extra Usage spends. Zen configured alone keeps its own balance card. A plan name that cannot be read is left blank rather than guessed.
+
+OpenAI's card also lists the account's reset credits: one button per ticket, with its expiry, behind a confirmation that says the redemption cannot be undone. Tickets are read from the Codex CLI's own `/backend-api/wham/rate-limit-reset-credits`; only a ticket that is `available`, plan-supported and unexpired becomes an option, and each click redeems the ticket it names with a caller-supplied request id so a retry cannot spend a second one. OpenCode Go, OpenCode Zen and OpenDesign report no reset tickets upstream, so they show no such control.
 
 All sign-ins write only the plugin's own credential records; model API keys and Codex OAuth are not overwritten.
 

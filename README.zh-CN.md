@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | `opencode-go` | Pi + Go 实时名单 | `OPENCODE_GO_API_KEY` | Go 套餐（Go Plan / Go Plus / Go Teams）与三项额度 |
 | `opencode`（Zen） | Pi + Zen 实时名单 | API Key 或 Console 设备登录 | Zen 钱包余额，与 Go 同卡显示 |
-| `openai-codex` | Pi 公开目录 | 原生 ChatGPT OAuth | OpenAI 订阅与套餐名（如 GPT Plus） |
+| `openai-codex` | Pi 公开目录 | 原生 ChatGPT OAuth | OpenAI 订阅、套餐名（如 GPT Plus）与重置卡 |
 | `opendesign`（预发布） | 账号目录 | API Key 或设备授权 | 账号模式显示额度与钱包 |
 
 ## 安装
@@ -37,6 +37,8 @@ dsh plugin --profile desktop add github:Luca4Don3/dsh-providers-live-models
 3. 打开**设置 → 账号与余额**查看额度；点**刷新额度**强制查询。卡片会跨重启缓存，`freshMs` 默认 5 分钟。
 
 卡片按订阅方命名：OpenAI 在标题下显示套餐（如 GPT Plus），OpenCode 在标题下显示 Go 套餐。Go 与 Zen 都配置时只出现一张 OpenCode 卡：上线是 Go 的 5 小时 / 1 周 / 1 月额度，下线是 Zen 的钱包余额（Extra Usage 花的就是它）。只配置 Zen 时它单独成一张余额卡。套餐名读不到时留空，不猜。
+
+OpenAI 卡还会列出账号的重置卡：每张一个按钮，标出有效期，点击前会二次确认并提示不可撤销。数据取自 Codex CLI 自己的 `/backend-api/wham/rate-limit-reset-credits`；只有 `available`、计划支持、且未过期的票才会变成可点的选项，每次点击只兑换它自己那张，并带上调用方生成的幂等 id，重试不会多花一张。OpenCode Go、OpenCode Zen 与 OpenDesign 上游没有重置卡概念，因此不显示该控件。
 
 所有登录只写插件自己的凭据记录，不改写模型 API Key 或 Codex OAuth。
 

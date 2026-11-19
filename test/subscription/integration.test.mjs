@@ -212,6 +212,36 @@ test('unified entry mounts quota HTTP services under its own plugin lifetime', a
   await assert.rejects(usage.query('openai-codex'), error => error.code === 'timeout')
 })
 
+test('reset-credit HTTP route refuses cross-origin posts and unsupported providers', async () => {
+  const calls = []
+  const usage = { providers: ['openai-codex'], consumeReset: async (provider, creditId, requestId) => {
+    calls.push({ provider, creditId, requestId })
+    return { code: 'reset', windowsReset: 2 }
+  } }
+  const ctx = { get: () => usage }
+  async function post(headers, body) {
+    let status, payload
+    const req = { method: 'POST', url: '/dsh-providers-live-models/reset-credit', headers, body }
+    await handleLoginHttp(ctx, { ...req, [Symbol.asyncIterator]: async function* () { yield Buffer.from(JSON.stringify(body)) } },
+      { writeHead: code => { status = code }, end: data => { payload = JSON.parse(data) } })
+    return { status, payload }
+  }
+  // A foreign Origin is refused before any ticket is spent.
+  const refused = await post({ host: '127.0.0.1:1', origin: 'https://evil.example', 'content-type': 'application/json' },
+    { provider: 'openai-codex', creditId: 'c1' })
+  assert.equal(refused.status, 403)
+  assert.deepEqual(calls, [], 'nothing was spent')
+  // A provider with no reset tickets is refused too.
+  const unsupported = await post({ host: '127.0.0.1:1', 'content-type': 'application/json' }, { provider: 'opencode', creditId: 'c1' })
+  assert.equal(unsupported.status, 400)
+  assert.deepEqual(calls, [], 'still nothing spent')
+  // A same-origin post reaches the adapter once, with the caller's id.
+  const ok = await post({ host: '127.0.0.1:1', origin: 'http://127.0.0.1:1', 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+    { provider: 'openai-codex', creditId: 'c1', requestId: 'req-9' })
+  assert.equal(ok.status, 200)
+  assert.deepEqual(ok.payload, { code: 'reset', windowsReset: 2 })
+  assert.deepEqual(calls, [{ provider: 'openai-codex', creditId: 'c1', requestId: 'req-9' }])
+})
 test('usage HTTP endpoint queries only supported providers and reports auth errors', async () => {
   const seen = []
   const ctx = { get: () => ({ providers: ['openai-codex'], invalidate: id => seen.push(id), query: async () => { throw new QuotaError('auth-required', 'sign in first') } }) }

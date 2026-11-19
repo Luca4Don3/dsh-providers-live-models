@@ -397,6 +397,76 @@ test('with only Zen there is one Zen balance card and no Go card, and with only 
   assert.equal(goNodes.some(node => node.children.some(child => typeof child === 'string' && child.includes('钱包余额：'))), false, 'no wallet without Zen')
   goOnly.dispose()
 })
+test('the OpenAI card offers one use button per reset ticket, and asks before spending it', async () => {
+  const calls = []
+  let confirmed = null
+  const tickets = [
+    { creditId: 'RateLimitResetCredit_a', title: 'Full reset (Weekly + 5 hr)', expiresAt: 1796167683 },
+    { creditId: 'RateLimitResetCredit_b', title: 'Full reset (Weekly + 5 hr)', expiresAt: 1851099888 },
+  ]
+  const ui = loadClient({ confirm: message => { confirmed = message; return true }, fetchImpl: async (url, options) => {
+    calls.push({ url, options })
+    if (url.endsWith('/subscriptions')) return response({ subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] })
+    if (url.endsWith('/reset-credit')) return response({ code: 'reset', windowsReset: 2 })
+    return response({ status: 'exhausted', plan: 'plus', capturedAt: 10000, resetCredits: { options: tickets },
+      windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 0 }] })
+  } })
+  ui.renderBalances(); ui.effects[0](); await tick()
+  const nodes = elements(ui.renderBalances())
+  assert.ok(nodes.some(node => node.children.includes('重置卡：2 张可用')))
+  assert.equal(nodes.filter(node => node.props?.['data-reset-credit']).length, 2, 'one button per ticket')
+  const button = nodes.find(node => node.props?.['data-reset-credit'] === 'openai-codex')
+  assert.ok(button.children.includes('使用重置卡'))
+  button.props.onClick(); await tick()
+  assert.match(String(confirmed), /不可撤销/, 'the confirmation says it cannot be undone')
+  const posted = calls.find(call => call.url.endsWith('/reset-credit'))
+  assert.ok(posted, 'the click posts exactly once')
+  const body = JSON.parse(posted.options.body)
+  assert.equal(body.provider, 'openai-codex')
+  assert.equal(body.creditId, 'RateLimitResetCredit_a', 'the clicked ticket is the one spent')
+  assert.equal(typeof body.requestId, 'string')
+  assert.ok(body.requestId.length >= 8, 'a request id accompanies the redemption')
+  ui.dispose()
+})
+
+test('cancelling the confirmation spends nothing', async () => {
+  const calls = []
+  const ui = loadClient({ confirm: () => false, fetchImpl: async (url, options) => {
+    calls.push({ url, options })
+    if (url.endsWith('/subscriptions')) return response({ subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] })
+    return response({ status: 'exhausted', capturedAt: 10000, resetCredits: { options: [{ creditId: 'c1', title: 'Full reset' }] },
+      windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 0 }] })
+  } })
+  ui.renderBalances(); ui.effects[0](); await tick()
+  const button = elements(ui.renderBalances()).find(node => node.props?.['data-reset-credit'])
+  button.props.onClick(); await tick()
+  assert.equal(calls.some(call => call.url.endsWith('/reset-credit')), false, 'no redemption without consent')
+  ui.dispose()
+})
+
+test('a card without reset tickets shows no reset controls at all', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
+    : { status: 'ready', windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 50 }], capturedAt: 10000 }) })
+  ui.renderBalances(); ui.effects[0](); await tick()
+  const nodes = elements(ui.renderBalances())
+  assert.equal(nodes.some(node => node.props?.['data-reset-credit']), false)
+  assert.equal(nodes.some(node => node.children.some(child => typeof child === 'string' && child.startsWith('重置卡：'))), false)
+  ui.dispose()
+})
+
+test('a failed reset-credit read is reported without touching the quota numbers', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
+    : { status: 'ready', capturedAt: 10000, resetCredits: { available: 0, options: [], unavailable: 'risk-control' },
+      windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 50 }] }) })
+  ui.renderBalances(); ui.effects[0](); await tick()
+  const nodes = elements(ui.renderBalances())
+  assert.ok(nodes.some(node => node.children.includes('剩余 50%')), 'quota survives')
+  assert.ok(nodes.some(node => node.children.some(child => typeof child === 'string' && child.includes('重置卡数量读取失败'))))
+  assert.equal(nodes.some(node => node.props?.['data-reset-credit']), false)
+  ui.dispose()
+})
 test('a billing rejection stays in the money row without claiming the key lacks permissions', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions: [{ providerId: 'opencode', label: 'OpenCode Zen', kind: 'balance', cacheKey: 'zen' }] }

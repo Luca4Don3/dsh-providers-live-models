@@ -63,6 +63,60 @@ test('Codex configuration discovery reads credential metadata without refreshing
   assert.equal(await createCodexAdapter({}).isConfigured(), false)
 })
 
+test('Codex reads the real reset tickets, not just their count', async () => {
+  const grant = { kind: 'grant', payload: { type: 'oauth', access: 'tok', refresh: 'r', expires: Date.now() + 3600000, accountId: 'acct-1' } }
+  const tickets = [{ id: 'RateLimitResetCredit_a', reset_type: 'codex_rate_limits', is_supported_by_plan: true,
+    status: 'available', title: 'Full reset (Weekly + 5 hr)', expires_at: '2026-12-01T22:48:03.205803Z' }]
+  const adapter = createCodexAdapter({ credentials: creds(grant), fetchImpl: async url => Response.json(
+    url.endsWith('/rate-limit-reset-credits') ? { available_count: 1, credits: tickets } : { rate_limit: { allowed: true } }) })
+  const result = await adapter.fetchUsage(await adapter.resolveAuth(), {})
+  assert.equal(result.resetCredits.available, 1)
+  assert.equal(result.resetCredits.options[0].creditId, 'RateLimitResetCredit_a')
+})
+
+test('a reset-credit failure never costs the usage snapshot', async () => {
+  const grant = { kind: 'grant', payload: { type: 'oauth', access: 'tok', refresh: 'r', expires: Date.now() + 3600000, accountId: 'acct-1' } }
+  for (const status of [403, 429, 500]) {
+    const adapter = createCodexAdapter({ credentials: creds(grant), fetchImpl: async url =>
+      url.endsWith('/rate-limit-reset-credits') ? Response.json({ private: '<token>' }, { status }) : Response.json({ rate_limit: { allowed: true } }) })
+    const result = await adapter.fetchUsage(await adapter.resolveAuth(), {})
+    assert.ok(result.usage.rate_limit, 'usage still arrives')
+    assert.equal(result.resetCredits.available, 0)
+    assert.ok(typeof result.resetCredits.unavailable === 'string', 'the failure is reported, not swallowed')
+  }
+})
+
+test('consuming a reset spends exactly the selected ticket with the caller request id', async () => {
+  const grant = { kind: 'grant', payload: { type: 'oauth', access: 'tok', refresh: 'r', expires: Date.now() + 3600000, accountId: 'acct-1' } }
+  const seen = []
+  const adapter = createCodexAdapter({ credentials: creds(grant), fetchImpl: async (url, options) => {
+    seen.push({ url, options })
+    return Response.json({ code: 'reset', credit: null, windows_reset: 2 })
+  } })
+  const outcome = await adapter.consumeReset('RateLimitResetCredit_a', 'req-1', {})
+  assert.deepEqual(outcome, { code: 'reset', windowsReset: 2 })
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].url, 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume')
+  assert.equal(seen[0].options.method, 'POST')
+  const body = JSON.parse(seen[0].options.body)
+  assert.equal(body.credit_id, 'RateLimitResetCredit_a', 'the selected ticket, never a server-chosen one')
+  assert.equal(body.redeem_request_id, 'req-1', 'the caller id, so a retry is deduped')
+  assert.equal(seen[0].options.headers['chatgpt-account-id'], 'acct-1')
+})
+
+test('a consume refusal is a typed failure, never a silent success', async () => {
+  const grant = { kind: 'grant', payload: { type: 'oauth', access: 'tok', refresh: 'r', expires: Date.now() + 3600000, accountId: 'acct-1' } }
+  for (const [status, code] of [[401, 'auth-required'], [403, 'risk-control'], [500, 'upstream']]) {
+    const adapter = createCodexAdapter({ credentials: creds(grant),
+      fetchImpl: async () => Response.json({ private: '<token>' }, { status }) })
+    await assert.rejects(adapter.consumeReset('credit', 'req', {}), error => error.code === code && !error.message.includes('<token>'))
+  }
+  const unknown = createCodexAdapter({ credentials: creds(grant), fetchImpl: async () => Response.json({ code: 'weird' }) })
+  await assert.rejects(unknown.consumeReset('credit', 'req', {}), error => error.code === 'invalid-response')
+  const adapter = createCodexAdapter({ credentials: creds(grant) })
+  await assert.rejects(adapter.consumeReset('', 'req', {}), error => error.code === 'invalid-input')
+  await assert.rejects(adapter.consumeReset('credit', '', {}), error => error.code === 'invalid-input')
+})
 test('Go names its plan from the Console product only when a Console session exists', async () => {
   const seen = []
   const consoleAuth = {

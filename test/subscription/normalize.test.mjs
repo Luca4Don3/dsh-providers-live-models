@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { normalizeCodex, normalizeOpenCodeGo, normalizeOpenCodeZen } from '../../lib/subscription/normalize.js'
+import { normalizeCodex, normalizeOpenCodeGo, normalizeOpenCodeZen, normalizeResetCredits } from '../../lib/subscription/normalize.js'
 import { accountKeyOf } from '../../lib/subscription/identity.js'
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
@@ -131,6 +131,48 @@ test('an OpenRouter key with nothing left reads exhausted rather than ready', as
   assert.equal(snap.credits.hasCredits, false)
 })
 
+test('only explicit, supported, unexpired Codex reset tickets become options', async () => {
+  const now = 1795071269006
+  const base = { id: 'RateLimitResetCredit_a', reset_type: 'codex_rate_limits', is_supported_by_plan: true,
+    status: 'available', title: 'Full reset (Weekly + 5 hr)', description: 'granted', expires_at: '2026-12-01T22:48:03.205803Z' }
+  const snap = normalizeResetCredits({ available_count: 1, credits: [base] }, { now })
+  assert.equal(snap.available, 1)
+  assert.equal(snap.options[0].creditId, base.id)
+  assert.equal(snap.options[0].title, base.title)
+  assert.equal(snap.options[0].expiresAt, Math.floor(Date.parse(base.expires_at) / 1000))
+  // Every refusal is a real rule, not a guess: unredeemable tickets never reach a button.
+  const refused = [
+    { ...base, status: 'redeemed' },
+    { ...base, status: 'expired' },
+    { ...base, is_supported_by_plan: false },
+    { ...base, reset_type: 'other' },
+    { ...base, id: '' },
+    { ...base, expires_at: '2026-01-01T00:00:00Z' },
+    { ...base, expires_at: 'not-a-date' },
+  ]
+  for (const credit of refused) {
+    assert.deepEqual(normalizeResetCredits({ credits: [credit] }, { now }).options, [], JSON.stringify(credit).slice(0, 60))
+  }
+})
+
+test('an unreadable reset payload yields no tickets and never invents one', () => {
+  for (const payload of [{}, { credits: null }, { credits: 'x' }, { available_count: 3 }, null, undefined]) {
+    const snap = normalizeResetCredits(payload, { now: 1795071269006 })
+    assert.equal(snap.available, 0)
+    assert.deepEqual(snap.options, [])
+  }
+  // A count the tickets do not back is reported, not silently equal.
+  assert.equal(normalizeResetCredits({ available_count: 5, credits: [] }, { now: 1 }).reported, 5)
+})
+
+test('tickets sort by expiry so a doomed one never sits ahead of a usable one', () => {
+  const near = { id: 'a', reset_type: 'codex_rate_limits', is_supported_by_plan: true, status: 'available', title: 'A', expires_at: '2026-12-01T00:00:00Z' }
+  const far = { ...near, id: 'b', title: 'B', expires_at: '2026-12-20T00:00:00Z' }
+  const none = { ...near, id: 'c', title: 'C' }
+  delete none.expires_at
+  const snap = normalizeResetCredits({ credits: [none, far, near] }, { now: 1 })
+  assert.deepEqual(snap.options.map(o => o.creditId), ['a', 'b', 'c'])
+})
 test('Command Code keeps dollars and plan windows apart', async () => {
   const { normalizeCommandCode } = await import('../../lib/subscription/normalize.js')
   const snap = normalizeCommandCode({
