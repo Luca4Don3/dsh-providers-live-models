@@ -76,6 +76,19 @@ test('a store with no path is never shared, because it cannot save', async () =>
   assert.notEqual(createOpenDesignPreferences({ file: undefined }), createOpenDesignPreferences({ file: undefined }))
   assert.notEqual(createOpenDesignPreferences({ file: '' }), createOpenDesignPreferences({ file: '' }))
 })
+test('a second module instance still finds the one store for a path', async () => {
+  // A plugin reload, or any second import specifier for this file, evaluates the
+  // module again and gets a fresh module scope. The registry must not live there:
+  // the invariant is about the file on disk, which outlives every module copy.
+  const { mkdtempSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const file = join(mkdtempSync(join(tmpdir(), 'od-prefs-')), 'opendesign.json')
+  const first = createOpenDesignPreferences({ file })
+  // `?again` forces a second evaluation of the same source file.
+  const second = (await import('../lib/opendesign/preferences.js?again')).createOpenDesignPreferences({ file })
+  assert.equal(first, second, 'one path, one store, even across module instances')
+})
 test('prune removes ids the roster no longer offers, and only those', async () => {
   const file = join(dir(), 'opendesign.json')
   const pref = createOpenDesignPreferences({ file })

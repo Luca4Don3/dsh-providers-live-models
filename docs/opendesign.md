@@ -178,6 +178,12 @@ a path names a file, a file has one content, so a path names one store. An empty
 path is deliberately not shared, because those stores cannot save and sharing
 them would turn one caller's failure into another caller's silent no-op.
 
+The registry lives on `globalThis` under a `Symbol.for` key, not at module scope.
+A module-level Map is one per *module instance*, and a plugin reload — or a second
+import specifier for the same file — evaluates the module again and gets a fresh
+scope with an empty Map. The invariant is about the file, so the registry has to
+outlive every module copy.
+
 ## Reasoning levels
 
 The picker offers a reasoning control only for models whose accepted levels are
