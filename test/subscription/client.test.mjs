@@ -446,11 +446,14 @@ test('cancelling the confirmation spends nothing', async () => {
 })
 
 test('a ticket row shows the product word and its expiry, not the vendor parenthetical', async () => {
+  // 12:00 UTC: the calendar date is the same in UTC and Asia/Shanghai, so this
+  // asserts the formatting rather than the runner's time zone. The real API sends
+  // instants near midnight UTC, which is exactly why the label is local.
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
     : { status: 'exhausted', capturedAt: 10000, resetCredits: { options: [
-        { creditId: 'a', title: 'Full reset (Weekly + 5 hr)', expiresAt: 1796165283 },
-        { creditId: 'b', title: 'Full reset（每周 + 5 小时）', expiresAt: 1797111888 },
+        { creditId: 'a', title: 'Full reset (Weekly + 5 hr)', expiresAt: 1796212800 },
+        { creditId: 'b', title: 'Full reset（每周 + 5 小时）', expiresAt: 1797163200 },
         { creditId: 'c', title: 'Full reset' }] },
       windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 0 }] }) })
   ui.renderBalances(); ui.effects[0](); await tick()

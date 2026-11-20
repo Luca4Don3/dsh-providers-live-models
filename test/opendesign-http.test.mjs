@@ -250,6 +250,35 @@ test('the unified catalog lists OpenDesign beside the overlaid routes', async ()
 })
 
 
+test('a saved switch is what the catalog reports on the very next read', async () => {
+  // The real page saves, then re-reads. A second store over the same file used to
+  // answer from its startup snapshot, so a model the user switched off came back
+  // on until the process restarted.
+  const { mkdtempSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { createOpenDesignPreferences } = await import('../lib/opendesign/preferences.js')
+  const file = join(mkdtempSync(join(tmpdir(), 'od-http-')), 'opendesign.json')
+  const preferences = createOpenDesignPreferences({ file })
+  await preferences.load()
+  // Mirrors opencodeModelCatalog.routes(): the catalog's `enabled` flag is derived
+  // from the same preference store the POST writes through.
+  const routes = () => {
+    const disabled = new Set(preferences.disabledFor('opencode-go'))
+    return [{ id: 'opencode-go', label: 'OpenCode Go',
+      models: ['go-a', 'go-b'].map(id => ({ id, name: id, enabled: !disabled.has(id) })) }]
+  }
+  const provider = { status: () => ({ available: false }), models: () => [] }
+  const saved = await call(authFixture(), 'POST', '/routes/enabled',
+    { provider: 'opencode-go', enabledModels: ['go-a'] }, undefined, provider,
+    { getRoutes: routes, preferences })
+  assert.equal(saved.status, 200)
+  const read = await call(authFixture(), 'GET', '/routes', undefined, undefined, provider,
+    { getRoutes: routes, preferences })
+  const models = read.body.routes.find(route => route.id === 'opencode-go').models
+  assert.deepEqual(models.map(model => [model.id, model.enabled]), [['go-a', true], ['go-b', false]],
+    'the switch that was turned off stays off immediately, not after a restart')
+})
 test('a disabled id from the store is reported as disabled by the catalog', async () => {
   const provider = { status: () => ({ available: true }), models: () => [] }
   const preferences = { snapshot: () => ({ disabledModels: [], reasoning: {}, providers: { 'opencode-go': { disabledModels: ['go-b'] } } }) }

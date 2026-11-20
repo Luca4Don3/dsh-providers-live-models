@@ -57,6 +57,25 @@ test('a saved selection is reported as loaded, a missing one is not', async () =
 })
 
 
+test('two halves of the plugin share one store, so a save is immediately visible', async () => {
+  const file = join(dir(), 'opendesign.json')
+  // These two calls stand in for the model filter and the HTTP route: both ask for
+  // a store on the same path, and both must see the other's writes.
+  const modelFilter = createOpenDesignPreferences({ file })
+  const httpRoute = createOpenDesignPreferences({ file })
+  assert.equal(modelFilter, httpRoute, 'one path maps to one store')
+  await modelFilter.load()
+  await httpRoute.setDisabledFor('openai-codex', ['gpt-6-luna'])
+  // Before the fix this answered [] until a restart, which is exactly the bug:
+  // a model the user switched off came back on after saving.
+  assert.deepEqual(modelFilter.disabledFor('openai-codex'), ['gpt-6-luna'])
+})
+
+test('a store with no path is never shared, because it cannot save', async () => {
+  // Sharing these would make one caller's failure another caller's silent no-op.
+  assert.notEqual(createOpenDesignPreferences({ file: undefined }), createOpenDesignPreferences({ file: undefined }))
+  assert.notEqual(createOpenDesignPreferences({ file: '' }), createOpenDesignPreferences({ file: '' }))
+})
 test('prune removes ids the roster no longer offers, and only those', async () => {
   const file = join(dir(), 'opendesign.json')
   const pref = createOpenDesignPreferences({ file })

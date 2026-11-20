@@ -167,6 +167,17 @@ without a restart.
 The endpoint rejects ids the current roster does not carry, so a stale preference
 cannot accumulate and silently filter a model that reappears later.
 
+### One store per path
+
+Two halves of the plugin touch this file: the model filter that decides what the
+picker offers, and the HTTP route that saves the switches. Each used to build its
+own store over the same path, so a save updated the writer's memory and left the
+reader holding what it had at startup — switches came back on until the process
+restarted. `createOpenDesignPreferences()` now returns **one instance per path**:
+a path names a file, a file has one content, so a path names one store. An empty
+path is deliberately not shared, because those stores cannot save and sharing
+them would turn one caller's failure into another caller's silent no-op.
+
 ## Reasoning levels
 
 The picker offers a reasoning control only for models whose accepted levels are
