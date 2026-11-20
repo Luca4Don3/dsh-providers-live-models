@@ -719,7 +719,7 @@ test('account page queries only configured subscriptions and refreshes their rem
   cleanup()
 })
 
-test('account page keeps the original subscriptions plus OpenDesign and displays at most four', async () => {
+test('account page keeps every configured subscription up to the cap and merges Zen', async () => {
   const calls = []
   const ui = loadClient({ fetchImpl: async url => {
     calls.push(url)
@@ -733,8 +733,9 @@ test('account page keeps the original subscriptions plus OpenDesign and displays
   ui.effects[0]()
   await tick()
   const cards = elements(ui.renderBalances()).filter(node => node.props?.['data-subscription'])
-  assert.deepEqual(cards.map(node => node.props['data-subscription']), ['openai-codex', 'opencode-go', 'opendesign'])
-  assert.equal(calls.length, 5, 'one list request and at most four usage requests')
+  // deepseek is filtered, the duplicate collapses, and Zen reports through Go.
+  assert.deepEqual(cards.map(node => node.props['data-subscription']), ['openai-codex', 'opencode-go', 'opendesign', 'fixture-fifth'])
+  assert.equal(calls.length, 6, 'one list request plus one usage request per admitted provider')
 })
 
 test('an account without subscriptions renders no quota cards or usage requests', async () => {

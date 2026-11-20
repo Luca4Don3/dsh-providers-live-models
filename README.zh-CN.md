@@ -16,6 +16,7 @@
 | `opencode-go` | Pi + Go 实时名单 | `OPENCODE_GO_API_KEY` | Go 套餐（Go Plan / Go Plus / Go Teams）与三项额度 |
 | `opencode`（Zen） | Pi + Zen 实时名单 | API Key 或 Console 设备登录 | Zen 钱包余额，与 Go 同卡显示 |
 | `openai-codex` | Pi 公开目录 | 原生 ChatGPT OAuth | OpenAI 订阅、套餐名（如 GPT Plus）与重置卡 |
+| `ollama` | Pi 目录 | `OLLAMA_API_KEY` | 月度美元池、套餐名与购买余额 |
 | `opendesign`（预发布） | 账号目录 | API Key 或设备授权 | 账号模式显示额度与钱包 |
 
 ## 安装

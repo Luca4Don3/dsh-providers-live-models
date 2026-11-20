@@ -201,7 +201,7 @@ test('unified entry mounts quota HTTP services under its own plugin lifetime', a
   })
   await Promise.all(pending)
   assert.deepEqual(services.get('subscriptionUsage').providers,
-    ['openai-codex', 'opencode-go', 'opencode', 'openrouter', 'commandcode', 'opendesign'])
+    ['openai-codex', 'opencode-go', 'opencode', 'openrouter', 'commandcode', 'ollama', 'opendesign'])
   assert.equal(routes[0].path, '/dsh-providers-live-models')
   const body = await new Promise(resolve => routes[0].handler({ method: 'GET', url: routes[0].path + '/status', headers: {} }, { writeHead() {}, end: data => resolve(JSON.parse(data)) }))
   assert.equal(body.loggedIn, true)

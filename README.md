@@ -16,6 +16,7 @@ It also adds compaction recovery: long histories are summarized in capacity-awar
 | `opencode-go` | Pi + live Go roster | `OPENCODE_GO_API_KEY` | Go plan (Go Plan / Go Plus / Go Teams) and its three limits |
 | `opencode` (Zen) | Pi + live Zen roster | API key or Console device login | Zen wallet, shown in the same card as Go |
 | `openai-codex` | Pi public catalog | native ChatGPT OAuth | OpenAI subscription, plan name (for example GPT Plus), and reset credits |
+| `ollama` | Pi catalog | `OLLAMA_API_KEY` | monthly dollar pool, plan name, purchased credits |
 | `opendesign` (prerelease) | account catalog | API key or device authorization | quota and wallet in account mode |
 
 ## Install

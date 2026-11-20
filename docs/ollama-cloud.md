@@ -1,6 +1,8 @@
 # Ollama Cloud quota design
 
-Status: **draft, not implemented.** Nothing in `lib/` reads Ollama yet.
+Status: **implemented** in `lib/subscription/providers/ollama.js` and
+`normalizeOllamaCloud()`. The card is a subscription card, not a balance card,
+because a monthly pool is a quota even though it is denominated in dollars.
 
 ## Why this is not just "another window provider"
 

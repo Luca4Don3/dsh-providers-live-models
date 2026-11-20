@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { normalizeCodex, normalizeOpenCodeGo, normalizeOpenCodeZen, normalizeResetCredits } from '../../lib/subscription/normalize.js'
+import { normalizeCodex, normalizeOpenCodeGo, normalizeOpenCodeZen, normalizeResetCredits, normalizeOllamaCloud } from '../../lib/subscription/normalize.js'
 import { accountKeyOf } from '../../lib/subscription/identity.js'
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
@@ -131,6 +131,64 @@ test('an OpenRouter key with nothing left reads exhausted rather than ready', as
   assert.equal(snap.credits.hasCredits, false)
 })
 
+test('an Ollama monthly pool becomes one month window with its dollar pair', () => {
+  const snap = normalizeOllamaCloud({
+    included: { balance_usd: 72.5, allowance_usd: 100, period: { from: '2026-09-15T09:30:00Z', until: '2026-10-15T09:30:00Z' } },
+    purchased: { balance_usd: 25 },
+  }, { capturedAt: 1 })
+  assert.equal(snap.providerId, 'ollama')
+  assert.equal(snap.status, 'ready')
+  assert.equal(snap.windows.length, 1)
+  const w = snap.windows[0]
+  assert.equal(w.id, 'monthly')
+  assert.equal(w.remainingPercent, 72.5)
+  assert.equal(w.display, '$72.50 / $100.00')
+  assert.equal(w.resetsAt, '2026-10-15T09:30:00Z')
+  // No windowMinutes: a 28-31 day cycle must not be titled by its length.
+  assert.equal(w.windowMinutes, undefined)
+  assert.deepEqual(snap.credits, { hasCredits: true, balance: 25, currency: 'USD' })
+})
+
+test('an Ollama plan is named on its published allowance, and only then', () => {
+  for (const [allowance, plan] of [[60, 'Pro'], [300, 'Max'], [1000, 'Team']]) {
+    const snap = normalizeOllamaCloud({ included: { balance_usd: allowance / 2, allowance_usd: allowance } }, { capturedAt: 1 })
+    assert.equal(snap.plan, plan, String(allowance) + ' names ' + plan)
+  }
+  // A prorated or promotional pool matches no published number and stays unnamed.
+  for (const allowance of [15, 100, 200, 0]) {
+    assert.equal(normalizeOllamaCloud({ included: { balance_usd: 1, allowance_usd: allowance } }, { capturedAt: 1 }).plan, undefined)
+  }
+})
+
+test('legacy Ollama session and weekly windows still read, and win over the pool', () => {
+  const snap = normalizeOllamaCloud({ included: {
+    session: { remaining_percent: 75, resets_at: '2026-10-01T07:00:00Z' },
+    weekly: { remaining_percent: 40, resets_at: '2026-10-05T00:00:00Z' },
+  }, purchased: { balance_usd: 25 } }, { capturedAt: 1 })
+  assert.deepEqual(snap.windows.map(w => w.id), ['session', 'weekly'])
+  assert.equal(snap.windows[0].remainingPercent, 75)
+  assert.equal(snap.windows[1].remainingPercent, 40)
+  assert.equal(snap.plan, undefined, 'no allowance reported, so no plan name')
+})
+
+test('no allowance means no percent window, never 剩余 0%', () => {
+  for (const payload of [{ purchased: { balance_usd: 25 } }, { included: { balance_usd: 25 } },
+    { included: { allowance_usd: 0, balance_usd: 25 } }, {}]) {
+    const snap = normalizeOllamaCloud(payload, { capturedAt: 1 })
+    assert.equal(snap.windows.length, 0, JSON.stringify(payload))
+    assert.equal(snap.status, 'unknown')
+  }
+  // Purchased credits alone still report as a wallet.
+  assert.deepEqual(normalizeOllamaCloud({ purchased: { balance_usd: 25 } }, { capturedAt: 1 }).credits,
+    { hasCredits: true, balance: 25, currency: 'USD' })
+})
+
+test('an exhausted Ollama pool is exhausted, not unknown', () => {
+  const snap = normalizeOllamaCloud({ included: { balance_usd: 0, allowance_usd: 60 } }, { capturedAt: 1 })
+  assert.equal(snap.windows[0].remainingPercent, 0)
+  assert.equal(snap.status, 'exhausted')
+  assert.equal(snap.plan, 'Pro')
+})
 test('only explicit, supported, unexpired Codex reset tickets become options', async () => {
   const now = 1795071269006
   const base = { id: 'RateLimitResetCredit_a', reset_type: 'codex_rate_limits', is_supported_by_plan: true,

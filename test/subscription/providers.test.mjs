@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createCodexAdapter } from '../../lib/subscription/providers/codex.js'
 import { createOpenCodeGoAdapter } from '../../lib/subscription/providers/opencode-go.js'
 import { createOpenCodeZenAdapter } from '../../lib/subscription/providers/opencode-zen.js'
+import { createOllamaAdapter } from '../../lib/subscription/providers/ollama.js'
 
 const grant = (expires = Date.now() + 3600000) => ({ kind: 'grant', payload: { type: 'oauth', access: 'tok', refresh: 'r', expires, accountId: 'acct-1' } })
 const creds = record => ({ readRecord: async () => record, resolve: async () => undefined })
@@ -63,6 +64,42 @@ test('Codex configuration discovery reads credential metadata without refreshing
   assert.equal(await createCodexAdapter({}).isConfigured(), false)
 })
 
+test('Ollama reads only the official balance endpoint with the configured key', async () => {
+  const seen = []
+  const adapter = createOllamaAdapter({ credentials: { resolve: async name => { assert.equal(name, 'OLLAMA_KEY'); return { value: '<token>' } } },
+    refName: '!OLLAMA_KEY', fetchImpl: async (url, options) => {
+      seen.push(url)
+      assert.equal(options.method, 'GET')
+      assert.equal(options.redirect, 'error')
+      assert.equal(options.headers.authorization, 'Bearer <token>')
+      return Response.json({ included: { balance_usd: 72.5, allowance_usd: 100 }, purchased: { balance_usd: 25 } })
+    } })
+  assert.equal(await adapter.isConfigured(), true)
+  const snap = adapter.normalize(await adapter.fetchUsage(await adapter.resolveAuth()), { capturedAt: 1 })
+  assert.deepEqual(seen, ['https://ollama.com/api/balance'], 'one documented endpoint, nothing else')
+  assert.equal(snap.windows[0].remainingPercent, 72.5)
+})
+
+test('Ollama missing credentials and refusals stay explicit failures', async () => {
+  const missing = createOllamaAdapter({ credentials: { resolve: async () => undefined } })
+  assert.equal(await missing.isConfigured(), false)
+  await assert.rejects(missing.resolveAuth(), error => error.code === 'auth-required')
+  // 429 is rate limiting, 503 is upstream: distinct classes, both surfaced.
+  for (const [status, code] of [[401, 'auth-required'], [403, 'risk-control'], [429, 'rate-limited'], [503, 'upstream']]) {
+    const adapter = createOllamaAdapter({ fetchImpl: async () => Response.json({ error: 'invalid credentials' }, { status }) })
+    await assert.rejects(adapter.fetchUsage({ authorization: 'Bearer <token>' }), error => error.code === code)
+  }
+})
+
+test('Ollama display scope is stable and never contains the key', async () => {
+  let value = '<token-a>'
+  const credentials = { resolve: async () => ({ value }) }
+  const first = await createOllamaAdapter({ credentials }).displayKey()
+  assert.equal(first.includes(value), false)
+  assert.equal(await createOllamaAdapter({ credentials }).displayKey(), first)
+  value = '<token-b>'
+  assert.notEqual(await createOllamaAdapter({ credentials }).displayKey(), first)
+})
 test('Codex reads the real reset tickets, not just their count', async () => {
   const grant = { kind: 'grant', payload: { type: 'oauth', access: 'tok', refresh: 'r', expires: Date.now() + 3600000, accountId: 'acct-1' } }
   const tickets = [{ id: 'RateLimitResetCredit_a', reset_type: 'codex_rate_limits', is_supported_by_plan: true,
