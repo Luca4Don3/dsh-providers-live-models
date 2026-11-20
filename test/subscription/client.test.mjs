@@ -445,6 +445,25 @@ test('cancelling the confirmation spends nothing', async () => {
   ui.dispose()
 })
 
+test('a ticket row shows the product word and its expiry, not the vendor parenthetical', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
+    : { status: 'exhausted', capturedAt: 10000, resetCredits: { options: [
+        { creditId: 'a', title: 'Full reset (Weekly + 5 hr)', expiresAt: 1796165283 },
+        { creditId: 'b', title: 'Full reset（每周 + 5 小时）', expiresAt: 1797111888 },
+        { creditId: 'c', title: 'Full reset' }] },
+      windows: [{ id: 'primary', windowMinutes: 300, remainingPercent: 0 }] }) })
+  ui.renderBalances(); ui.effects[0](); await tick()
+  const nodes = elements(ui.renderBalances())
+  const labels = nodes.filter(node => node.type === 'span' && node.props?.style?.flex === 1).map(node => node.children?.[0])
+  assert.deepEqual(labels.slice(0, 3), [
+    'Full reset（有效期至 12/2/2026）',
+    'Full reset（有效期至 12/13/2026）',
+    'Full reset（无有效期）',
+  ])
+  // The full vendor title still names the ticket when it is about to be spent.
+  ui.dispose()
+})
 test('a card without reset tickets shows no reset controls at all', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
