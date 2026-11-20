@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +8,16 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { createOpenDesignPreferences } from '../lib/opendesign/preferences.js'
 import { findProfileDir } from '../lib/opendesign/profile-dir.js'
 
-const dir = () => mkdtempSync(join(tmpdir(), 'od-prefs-'))
+// Every temporary directory this file creates is removed when the suite ends.
+// Without it each run left one behind: 769 had accumulated in the system temp
+// directory, because a fixture directory is not something the OS collects.
+const created = []
+const dir = () => {
+  const path = mkdtempSync(join(tmpdir(), 'od-prefs-'))
+  created.push(path)
+  return path
+}
+process.on('exit', () => { for (const path of created) rmSync(path, { recursive: true, force: true }) })
 
 
 test('the store reports a missing path instead of pretending to save', async () => {
@@ -80,10 +89,7 @@ test('a second module instance still finds the one store for a path', async () =
   // A plugin reload, or any second import specifier for this file, evaluates the
   // module again and gets a fresh module scope. The registry must not live there:
   // the invariant is about the file on disk, which outlives every module copy.
-  const { mkdtempSync } = await import('node:fs')
-  const { tmpdir } = await import('node:os')
-  const { join } = await import('node:path')
-  const file = join(mkdtempSync(join(tmpdir(), 'od-prefs-')), 'opendesign.json')
+  const file = join(dir(), 'opendesign.json')
   const first = createOpenDesignPreferences({ file })
   // `?again` forces a second evaluation of the same source file.
   const second = (await import('../lib/opendesign/preferences.js?again')).createOpenDesignPreferences({ file })

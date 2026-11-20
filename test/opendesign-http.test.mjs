@@ -250,15 +250,19 @@ test('the unified catalog lists OpenDesign beside the overlaid routes', async ()
 })
 
 
-test('a saved switch is what the catalog reports on the very next read', async () => {
+test('a saved switch is what the catalog reports on the very next read', async t => {
   // The real page saves, then re-reads. A second store over the same file used to
   // answer from its startup snapshot, so a model the user switched off came back
   // on until the process restarted.
-  const { mkdtempSync } = await import('node:fs')
+  const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const { createOpenDesignPreferences } = await import('../lib/opendesign/preferences.js')
-  const file = join(mkdtempSync(join(tmpdir(), 'od-http-')), 'opendesign.json')
+  const tempDir = mkdtempSync(join(tmpdir(), 'od-http-'))
+  // Remove it with the test: a fixture directory left on disk is not something
+  // the OS is asked to collect, and these used to pile up one per run.
+  t.after(() => rmSync(tempDir, { recursive: true, force: true }))
+  const file = join(tempDir, 'opendesign.json')
   const preferences = createOpenDesignPreferences({ file })
   await preferences.load()
   // Mirrors opencodeModelCatalog.routes(): the catalog's `enabled` flag is derived

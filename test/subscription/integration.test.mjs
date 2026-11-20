@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, mkdirSync, mkdtempSync } from 'node:fs'
+import { readFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createQuotaEngine } from '../../lib/subscription/engine.js'
 import { createCodexAdapter } from '../../lib/subscription/providers/codex.js'
@@ -175,10 +175,13 @@ test('configured Zen uses its custom credential reference and exposes only a bal
   assert.ok(refs.includes('ZEN_CUSTOM'))
 })
 
-test('unified entry mounts quota HTTP services under its own plugin lifetime', async () => {
+test('unified entry mounts quota HTTP services under its own plugin lifetime', async t => {
   const tempRoot = fileURLToPath(new URL('../../.temp/', import.meta.url))
   mkdirSync(tempRoot, { recursive: true })
-  process.env.DSH_PROFILE_DIR = mkdtempSync(tempRoot + 'merged-entry-')
+  const profileDir = process.env.DSH_PROFILE_DIR = mkdtempSync(tempRoot + 'merged-entry-')
+  // Each run used to leave this directory behind: 45 empty ones had accumulated,
+  // because nothing removed what the profile path had to exist for.
+  t.after(() => { rmSync(profileDir, { recursive: true, force: true }) })
   const { apply } = await import('../../lib/index.js')
   const disposers = [], routes = [], pending = []
   const services = new Map([['credentials', { describeRecord: async () => ({ configured: true }) }]])
