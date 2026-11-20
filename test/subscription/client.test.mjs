@@ -457,9 +457,9 @@ test('a ticket row shows the product word and its expiry, not the vendor parenth
   const nodes = elements(ui.renderBalances())
   const labels = nodes.filter(node => node.type === 'span' && node.props?.style?.flex === 1).map(node => node.children?.[0])
   assert.deepEqual(labels.slice(0, 3), [
-    'Full reset（有效期至 12/2/2026）',
-    'Full reset（有效期至 12/13/2026）',
-    'Full reset（无有效期）',
+    'Full reset 12/2/2026',
+    'Full reset 12/13/2026',
+    'Full reset 无有效期',
   ])
   // The full vendor title still names the ticket when it is about to be spent.
   ui.dispose()
