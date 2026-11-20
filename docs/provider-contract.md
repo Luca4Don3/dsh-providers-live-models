@@ -67,3 +67,20 @@ after registration has no effect.
 A worked example of designing a provider before writing any code is
 [`ollama-cloud.md`](ollama-cloud.md): the billing-unit shape, the plan-name policy,
 what breaks at the 4-subscription cap, and what is deliberately out of scope.
+
+## Plan names
+
+A plan line always prints the **vendor's own plan name**, spelled as the vendor
+spells it (`Go Plan` / `Go Plus` / `Go Teams`, `GPT Plus`, `GOAT`, `Pro`, `Max`,
+`Team`). Never invent a tier, never translate it, never renumber it.
+
+The name must come from a reliable source, in this order:
+
+1. The vendor reports it in a response field (`plan_type`, `product`, `planId`).
+2. The vendor publishes it beside a number the response does carry (an allowance
+   or credit figure), matched **exactly**, compared in integer cents.
+3. Otherwise the line is empty.
+
+Step 2 exists because a marketing pool can be prorated or promotional; an exact
+match on a published number will not silently mislabel. When a vendor changes its
+published allowances, the table and its tests change in the same commit.

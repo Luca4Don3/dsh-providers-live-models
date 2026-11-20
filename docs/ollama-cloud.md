@@ -61,19 +61,36 @@ balance. Optional.
 `GET /api/balance` without a key answers `401 {"error":"invalid credentials"}`,
 which is how the adapter distinguishes "no key" from "wrong key".
 
-## Plan names
+## Plan names: use Ollama's own, exactly
 
-The balance payload carries **no plan name**. Published pricing (2026-08-31):
-Pro \$20 incl. \$60 usage, Max \$100 incl. \$300, Team \$500 incl. \$1,000 shared,
-Free includes a small monthly amount, pay-as-you-go adds purchased credits.
+The balance payload carries **no plan name**, so the name comes from Ollama's
+published plan list and is matched on the allowance it publishes. Names are the
+vendor's, verbatim — no invented tiers, no translations:
 
-Two options, and this is a decision the owner has to make:
+| Official plan | `allowance_usd` | Price |
+| --- | --- | --- |
+| Pay as you go | no pool | per token; purchased credits only |
+| Pro | 60 | \$20/mo or \$200/yr |
+| Max | 300 | \$100/mo |
+| Team | 1000 | \$500/mo, shared across the team |
+| Enterprise | custom | contact sales |
 
-- **A (recommended): leave the plan line empty.** Consistent with the existing rule
-  that an unreadable plan name is never guessed.
-- **B: infer from `allowance_usd` by exact match** (60 → Pro, 300 → Max, 1000 →
-  Team), unnamed otherwise. Defensible because the numbers are published and
-  exact, but a prorated or promotional allowance would silently mislabel.
+Matching rule: **exact equality on `allowance_usd`**, with a small tolerance only
+for float representation (compare cents as integers). A value that matches no
+published allowance stays unnamed — that is what protects a prorated first month
+or a promotional pool from being labelled wrong.
+
+`Pay as you go` reports no `included` pool at all, which is the signal for it:
+when `included` is absent or `allowance_usd` is 0, name the plan `Pay as you go`
+only if `purchased.balance_usd` is present; otherwise leave the line empty.
+
+Two consequences worth stating:
+
+- A **Team** allowance is shared, so the name alone does not imply whose usage it
+  is. The card shows the number; the docs say the pool is shared.
+- Allowances can change between plans (they did on 2026-08-31), so the table is
+  the contract. When Ollama publishes new numbers, the table is updated in the
+  same change as the tests.
 
 ## Card layout (same shape as every other card)
 

@@ -58,6 +58,28 @@ stored in that service, never a cookie jar.
 along has been that a provider shows what its *official, documented* API reports,
 and never invents a number from an undocumented page.
 
+## Plan names: use Mistral's own, exactly
+
+Mistral publishes three consumer plans, and the Admin API does not report which
+one an Organization is on. The names are the vendor's, verbatim:
+
+| Official plan | Price | Monthly API credits |
+| --- | --- | --- |
+| Free | \$0 | none |
+| Pro | \$25.5/mo | \$15 |
+| Team | \$24.99/user/mo | \$50 (shared) |
+| Enterprise | custom | custom |
+
+`Education` is a discount variant of Pro, not a separate tier name, so it does not
+get its own label.
+
+Because no endpoint reports the plan, naming it would require inferring from the
+credit figure — the same rule as Ollama applies: match a **published** number
+exactly, and leave the line empty when nothing matches. Under option A the
+allowance shown is the Organization's spending limit, which is **not** the plan's
+credit figure, so in practice the plan line stays empty and the card shows spend
+and limit only.
+
 ## If A is chosen, the shape is already designed
 
 The card would be a **balance card**, not a subscription card, because the Admin
