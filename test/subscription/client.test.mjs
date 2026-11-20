@@ -581,6 +581,29 @@ test('login belongs to this package detail page in the sidebar plugin manager', 
   assert.ok(!elements(render()).some(node => node.children.includes('刷新额度')))
 })
 
+test('a configured provider rises above the ones still waiting to be set up', async () => {
+  // Each section asks its own endpoint; answer them independently.
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/dsh-providers-live-models/status')
+    ? { loggedIn: true, login: null } : { loggedIn: false, login: null }) })
+  ui.render(); ui.effects.forEach(effect => effect()); await tick()
+  const cards = elements(ui.render()).filter(node => node.props?.['data-login-card'] || node.props?.['data-opencode-login'] || node.props?.['data-opendesign-login'])
+  const orders = cards.map(node => node.props.style.order)
+  assert.deepEqual(orders, [0, 2, 2], 'the signed-in card orders first, the two signed-out ones after')
+  // Nothing is hidden: every card still renders, whatever its position.
+  assert.equal(cards.length, 3)
+  ui.dispose()
+})
+
+test('a device flow in progress sits between signed-in and untouched cards', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/dsh-providers-live-models/status')
+    ? { loggedIn: true, login: null }
+    : url.endsWith('/opencode/status') ? { loggedIn: false, login: { status: 'waiting' } }
+    : { loggedIn: false, login: null }) })
+  ui.render(); ui.effects.forEach(effect => effect()); await tick()
+  const cards = elements(ui.render()).filter(node => node.props?.['data-login-card'] || node.props?.['data-opencode-login'] || node.props?.['data-opendesign-login'])
+  assert.deepEqual(cards.map(node => node.props.style.order), [0, 1, 2], 'signed in, waiting, untouched')
+  ui.dispose()
+})
 test('plugin page reads status and its sign-in button starts the native login API', async () => {
   const calls = []
   const ui = loadClient({ fetchImpl: async (url, init) => {
