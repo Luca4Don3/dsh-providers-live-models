@@ -63,3 +63,7 @@ after registration has no effect.
 4. Storage: one `providers.<id>` key, with a matching logout route that deletes
    only its own record.
 5. Tests: the card test, the grouped-catalog test, and the casing test all cover it.
+
+A worked example of designing a provider before writing any code is
+[`ollama-cloud.md`](ollama-cloud.md): the billing-unit shape, the plan-name policy,
+what breaks at the 4-subscription cap, and what is deliberately out of scope.
