@@ -163,6 +163,20 @@ not claim requests will fail.
   "近 24 小时：N 次请求 · US$X", but it is a second request per refresh and a
   different kind of number from quota.
 
+## Which cost unit each provider uses
+
+Three shapes now coexist, and the card must not confuse them:
+
+| Provider | Unit | Where it lands on the card |
+| --- | --- | --- |
+| Codex, OpenCode Go, OpenDesign | percent of a time window | window row |
+| Command Code | percent of a dollar cap **and** a credit balance | window row + `display` + wallet |
+| Ollama | dollars of a monthly pool, **no percent cap** on some plans | dollar pair + wallet |
+| Mistral (if ever) | spend against an optional monthly limit | balance row |
+
+The rule that follows: **a provider with no cap gets no percent**, and a
+provider whose cap is money shows the money beside the percent.
+
 ## Verification gaps
 
 - **No key on this machine.** `grep OLLAMA` over the credential store returns

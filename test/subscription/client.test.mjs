@@ -464,6 +464,25 @@ test('a ticket row shows the product word and its expiry, not the vendor parenth
   // The full vendor title still names the ticket when it is about to be spent.
   ui.dispose()
 })
+test('a Command Code plan shows its name, its dollars per window, and its credit balance', async () => {
+  const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
+    ? { subscriptions: [{ providerId: 'commandcode', label: 'Command Code', cacheKey: 'cc' }] }
+    : { status: 'ready', plan: 'GOAT', capturedAt: 10000,
+        windows: [{ id: 'five-hour', windowMinutes: 300, remainingPercent: 60, display: '$4.00 / $10.00' }],
+        credits: { hasCredits: true, balance: 41.2, currency: 'USD' } }) })
+  ui.renderBalances(); ui.effects[0](); await tick()
+  const nodes = elements(ui.renderBalances())
+  assert.ok(nodes.some(node => node.children.includes('GOAT')), 'the plan id becomes its product name')
+  assert.ok(nodes.some(node => node.children.includes('$4.00 / $10.00')), 'the window carries its own money pair')
+  assert.ok(nodes.some(node => node.children.some(child => typeof child === 'string' && child.startsWith('钱包余额：'))))
+  assert.ok(nodes.some(node => node.children.some(child => typeof child === 'string' && /41\.20/.test(child))))
+  // The dollars survive a restart, like every other renderable field.
+  const cached = JSON.parse(ui.storage.getItem(STORAGE_KEY)).entries[0].snapshot
+  assert.equal(cached.plan, 'GOAT')
+  assert.equal(cached.credits.amount, 41.2)
+  assert.equal(cached.windows[0].display, '$4.00 / $10.00')
+  ui.dispose()
+})
 test('a card without reset tickets shows no reset controls at all', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/subscriptions')
     ? { subscriptions: [{ providerId: 'openai-codex', cacheKey: 'codex' }] }
