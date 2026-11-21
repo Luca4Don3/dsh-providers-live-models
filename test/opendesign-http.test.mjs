@@ -282,6 +282,9 @@ test('a saved switch is what the catalog reports on the very next read', async t
   const models = read.body.routes.find(route => route.id === 'opencode-go').models
   assert.deepEqual(models.map(model => [model.id, model.enabled]), [['go-a', true], ['go-b', false]],
     'the switch that was turned off stays off immediately, not after a restart')
+  const visibility = await call(authFixture(), 'GET', '/disabled-models', undefined, undefined, provider, { preferences })
+  assert.equal(visibility.status, 200)
+  assert.deepEqual(visibility.body.disabled, { 'opencode-go': ['go-b'], opendesign: [] })
 })
 test('a disabled id from the store is reported as disabled by the catalog', async () => {
   const provider = { status: () => ({ available: true }), models: () => [] }
