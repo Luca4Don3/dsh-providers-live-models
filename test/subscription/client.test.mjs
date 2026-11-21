@@ -1556,6 +1556,21 @@ test('the plugin page asks for the catalog on the OpenDesign-prefixed route', as
 })
 
 
+test('only actual OpenDesign catalog errors are shown beside other model channels', async () => {
+  for (const state of ['idle', 'unavailable', 'error']) {
+    const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/routes') ? {
+      routes: [{ id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] }],
+      status: { state },
+    } : { loggedIn: false }) })
+    ui.render(); ui.effects.forEach(effect => effect()); await tick()
+    const nodes = elements(ui.render())
+    assert.ok(nodes.some(node => node.props?.['data-provider-group'] === 'opencode'))
+    assert.equal(nodes.some(node => node.children.includes('OpenDesign 未登录或尚未就绪；其他渠道仍可使用。')), false, state)
+    assert.equal(nodes.some(node => node.children.includes('OpenDesign 模型目录读取失败；其他渠道仍可使用，请重试。')), state === 'error', state)
+    ui.dispose()
+  }
+})
+
 test('each provider group carries its display name in the expected case', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/opendesign/routes') ? { routes: [
     { id: 'opencode-go', label: 'OpenCode Go', models: [{ id: 'go-a', name: 'Go A', enabled: true }] },
