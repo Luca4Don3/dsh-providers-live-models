@@ -12,7 +12,7 @@ const crossProvider = { provider: 'openai-codex', model: high.model }
 const ok = { ok: true, value: undefined }
 const fail = { ok: false, error: { code: 'unchanged', message: 'not accepted' } }
 
-function fixture() {
+function fixture(fetchImpl) {
   class ModelDirectory {
     generation = 0
     disposed = false
@@ -41,10 +41,11 @@ function fixture() {
       if (this.state.status === 'ready' && this.selection) this.state.current = this.selection.next
     }
     resetConnected() { this.generation++; this.syncInputs() }
+    dispose() { this.disposed = true }
   }
   const native = ModelDirectory.prototype.select
   let entry, dispose
-  runInNewContext(source, { window: { __ModuleLoader__: { load: value => { entry = value } } } })
+  runInNewContext(source, { fetch: fetchImpl, window: { __ModuleLoader__: { load: value => { entry = value } } } })
   const client = entry.factory(id => id === 'react' ? {} : { ModelDirectory })
   client.apply({ slots: { inject() {} }, effect: fn => { dispose = fn() } })
   assert.notEqual(ModelDirectory.prototype.select, native, 'client mounted the compatibility patch')
@@ -153,6 +154,24 @@ test('stale replies after a newer selection or connection reset have no effect',
   d.replies.shift()(ok)
   await pending
   assert.equal(d.state.current.reasoningEffort, 'high')
+  cleanup()
+})
+
+test('saved disables remove only matching provider/model pairs from a stale picker', async () => {
+  let reply
+  const { directory: d, cleanup } = fixture(path => {
+    assert.ok(path.endsWith('/opendesign/disabled-models'))
+    return new Promise(resolve => { reply = resolve })
+  })
+  d.syncInputs()
+  reply({ status: 200, text: async () => JSON.stringify({ disabled: { [high.provider]: [high.model] } }) })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(d.state.routable, false)
+  assert.equal(d.state.groups[0].models.length, 1)
+  assert.equal(d.state.groups[0].models[0].id, other.model)
+  assert.equal(d.state.groups[1].models[0].id, high.model, 'same model ID under another provider is unaffected')
+  assert.equal(d.selection.next.model, high.model, 'current session selection was not silently replaced')
+  d.dispose()
   cleanup()
 })
 
