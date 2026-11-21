@@ -130,6 +130,11 @@ const expandAll = ui => {
   for (const button of elements(ui.render()).filter(node => node.props?.['data-toggle-route'])) button.props.onClick({ preventDefault() {} })
   return elements(ui.render())
 }
+const showSignIn = ui => {
+  const toggle = elements(ui.render()).find(node => node.props?.['data-toggle-signin'])
+  if (toggle?.props['aria-expanded'] === false) toggle.props.onClick()
+  return ui.render()
+}
 const tick = () => new Promise(resolve => setImmediate(resolve))
 const response = body => ({ status: 200, text: async () => JSON.stringify(body) })
 
@@ -584,27 +589,36 @@ test('login belongs to this package detail page in the sidebar plugin manager', 
   assert.ok(!elements(render()).some(node => node.children.includes('刷新额度')))
 })
 
-test('a configured provider rises above the ones still waiting to be set up', async () => {
-  // Each section asks its own endpoint; answer them independently.
+test('signed-out providers share one collapsed entry below the connected cards', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/dsh-providers-live-models/status')
     ? { loggedIn: true, login: null } : { loggedIn: false, login: null }) })
   ui.render(); ui.effects.forEach(effect => effect()); await tick()
-  const cards = elements(ui.render()).filter(node => node.props?.['data-login-card'] || node.props?.['data-opencode-login'] || node.props?.['data-opendesign-login'])
-  const orders = cards.map(node => node.props.style.order)
-  assert.deepEqual(orders, [0, 2, 2], 'the signed-in card orders first, the two signed-out ones after')
-  // Nothing is hidden: every card still renders, whatever its position.
-  assert.equal(cards.length, 3)
+  const cards = () => elements(ui.render()).flatMap(node => node.props?.['data-login-card'] ?? [])
+  const options = () => elements(ui.render()).flatMap(node => node.props?.['data-login-option'] ?? [])
+  const toggle = () => elements(ui.render()).find(node => node.props?.['data-toggle-signin'])
+  assert.deepEqual(cards(), ['openai'])
+  assert.deepEqual(options(), [])
+  assert.equal(toggle().props['aria-expanded'], false)
+  toggle().props.onClick()
+  assert.deepEqual(options(), ['opencode', 'opendesign'])
+  assert.deepEqual(cards(), ['openai'], 'sign-in options never become separate cards')
+  toggle().props.onClick()
+  assert.deepEqual(options(), [])
   ui.dispose()
 })
 
-test('a device flow in progress sits between signed-in and untouched cards', async () => {
+test('a pending device authorization is visible even if the shared entry was closed', async () => {
   const ui = loadClient({ fetchImpl: async url => response(url.endsWith('/dsh-providers-live-models/status')
     ? { loggedIn: true, login: null }
-    : url.endsWith('/opencode/status') ? { loggedIn: false, login: { status: 'waiting' } }
+    : url.endsWith('/opencode/status') ? { loggedIn: false, login: { status: 'waiting', userCode: 'TEST-CODE' } }
     : { loggedIn: false, login: null }) })
   ui.render(); ui.effects.forEach(effect => effect()); await tick()
-  const cards = elements(ui.render()).filter(node => node.props?.['data-login-card'] || node.props?.['data-opencode-login'] || node.props?.['data-opendesign-login'])
-  assert.deepEqual(cards.map(node => node.props.style.order), [0, 1, 2], 'signed in, waiting, untouched')
+  const nodes = elements(ui.render())
+  assert.deepEqual(nodes.flatMap(node => node.props?.['data-login-card'] ?? []), ['openai'])
+  assert.equal(nodes.find(node => node.props?.['data-toggle-signin']).props['aria-expanded'], true)
+  const option = nodes.find(node => node.props?.['data-login-option'] === 'opencode')
+  assert.ok(elements(option).some(node => node.children.includes('TEST-CODE')))
+  assert.ok(elements(option).some(node => node.children.includes('取消登录')))
   ui.dispose()
 })
 test('plugin page reads status and its sign-in button starts the native login API', async () => {
@@ -618,7 +632,7 @@ test('plugin page reads status and its sign-in button starts the native login AP
   await tick()
   assert.equal(calls[0].url, '/dsh-providers-live-models/status')
   assert.equal(calls[0].init.headers['content-type'], undefined)
-  const button = elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用账号登录'))
+  const button = elements(showSignIn(ui)).find(node => node.type === 'button' && node.children.includes('使用账号登录'))
   assert.ok(button)
   button.props.onClick()
   await tick()
@@ -638,6 +652,7 @@ test('plugin detail includes OpenCode official login, its device code, authoriza
   } })
   ui.render(); ui.effects[2](); await tick()
   assert.equal(calls[0].url, '/dsh-providers-live-models/opencode/status')
+  showSignIn(ui)
   const card = () => elements(ui.render()).find(node => node.props?.['data-opencode-login'])
   elements(card()).find(node => node.type === 'button').props.onClick(); await tick()
   assert.equal(calls[1].url, '/dsh-providers-live-models/opencode/login')
@@ -697,7 +712,7 @@ test('signed-in state offers re-login and cancellation failures are visible', as
     status: { loggedIn: false, login: { status: 'waiting' } },
     fetchImpl: async () => { throw new Error('network unavailable') },
   })
-  elements(ui.render()).find(node => node.type === 'button').props.onClick()
+  elements(ui.render()).find(node => node.type === 'button' && node.children.includes('取消登录')).props.onClick()
   await tick()
   assert.ok(elements(ui.render()).some(node => node.children.includes('network unavailable')))
 })
@@ -1111,7 +1126,7 @@ test('unavailable persistent storage remains an explicit non-blocking error', as
 test('signed out, both sign-in paths are offered and only one is expanded', async () => {
   const calls = []
   const ui = loadClient({ fetchImpl: async (url, init) => { calls.push([url, init]); return response({ loggedIn: false, mode: null, models: { state: 'idle', protocol: 'chat-completions' } }) } })
-  const tree = ui.render()
+  const tree = showSignIn(ui)
   const nodes = elements(tree)
   const label = node => node.props?.children ?? node.children?.[0]
   assert.ok(nodes.some(node => node.props?.['data-opendesign-login']))
@@ -1140,7 +1155,7 @@ test('the manual key field is offered only while signed out', async () => {
   } })
   const keyField = tree => elements(tree).some(node => node.type === 'input' && node.props['aria-label'] === 'OpenDesign API Key')
   const label = node => node.props?.children ?? node.children?.[0]
-  let tree = ui.render()
+  let tree = showSignIn(ui)
   assert.equal(keyField(tree), false, 'the field is hidden until the key path is chosen')
   elements(tree).find(node => node.type === 'button' && label(node) === '使用 API Key').props.onClick()
   tree = ui.render()
@@ -1162,13 +1177,37 @@ test('the manual key field is offered only while signed out', async () => {
   ui.dispose()
 })
 
+test('OpenDesign logout removes its standalone card and leaves the login action in the group', async () => {
+  const calls = []
+  const ui = loadClient({ confirm: () => true, fetchImpl: async (url, init) => {
+    calls.push([url, init.method])
+    if (url.endsWith('/opendesign/status')) return response({ loggedIn: true, mode: 'account' })
+    if (url.endsWith('/opendesign/logout')) return response({ loggedIn: false, mode: null })
+    return response({ loggedIn: true })
+  } })
+  ui.render(); ui.effects.forEach(effect => effect()); await tick()
+  const nodes = () => elements(ui.render())
+  const card = nodes().find(node => node.props?.['data-login-card'] === 'opendesign')
+  assert.ok(card)
+  assert.equal(nodes().some(node => node.props?.['data-signin-group']), false)
+  elements(card).find(node => node.type === 'button' && node.children.includes('退出登录')).props.onClick()
+  await tick()
+  assert.ok(calls.some(([url, method]) => url.endsWith('/opendesign/logout') && method === 'POST'))
+  assert.deepEqual(nodes().flatMap(node => node.props?.['data-login-card'] ?? []), ['openai', 'opencode'])
+  assert.equal(nodes().some(node => node.props?.['data-opendesign-login']), false)
+  const option = elements(showSignIn(ui)).find(node => node.props?.['data-login-option'] === 'opendesign')
+  assert.ok(elements(option).some(node => node.children.includes('使用账号授权')))
+  assert.ok(elements(option).some(node => node.children.includes('使用 API Key')))
+  ui.dispose()
+})
+
 test('OpenDesign account login renders only the official activation link and cancellation control', async () => {
   const calls = []
   const ui = loadClient({ fetchImpl: async (url, init) => {
     calls.push([url, init])
     return response({ loggedIn: false, login: { status: 'waiting', userCode: 'OD-CODE', openUrl: 'https://open-design.ai/cloud/cli/activate?code=example' } })
   } })
-  elements(ui.render()).find(node => node.type === 'button' && node.children.includes('使用账号授权')).props.onClick()
+  elements(showSignIn(ui)).find(node => node.type === 'button' && node.children.includes('使用账号授权')).props.onClick()
   await tick()
   const nodes = elements(ui.render())
   assert.equal(calls[0][0], '/dsh-providers-live-models/opendesign/login')
@@ -1399,7 +1438,7 @@ test('each model draws an iOS-style switch with a hidden native box', async () =
 test('cancelling a chosen path restores both sign-in options', async () => {
   const ui = loadClient({ fetchImpl: async () => response({ loggedIn: false, mode: null, models: { state: 'idle' } }) })
   const label = node => node.props?.children ?? node.children?.[0]
-  let nodes = elements(ui.render())
+  let nodes = elements(showSignIn(ui))
   nodes.find(node => node.type === 'button' && label(node) === '使用 API Key').props.onClick()
   nodes = elements(ui.render())
   assert.ok(nodes.some(node => node.type === 'button' && label(node) === '取消'), 'the key path can be cancelled')
@@ -1415,8 +1454,7 @@ test('starting the account path hides the key path until it is cancelled', async
     ? { loggedIn: false, login: { status: 'waiting', userCode: 'OD-CODE' }, models: { state: 'idle' } }
     : { loggedIn: false, mode: null, models: { state: 'idle' } }) })
   const label = node => node.props?.children ?? node.children?.[0]
-  let nodes = elements(ui.render())
-  nodes.find(node => node.type === 'button' && label(node) === '使用 API Key')
+  let nodes = elements(showSignIn(ui))
   nodes.find(node => node.type === 'button' && label(node) === '使用账号授权').props.onClick()
   await tick(); await tick()
   nodes = elements(ui.render())
