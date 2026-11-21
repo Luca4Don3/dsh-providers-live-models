@@ -143,7 +143,7 @@ globalThis.fetch = async (url, init) => {
     if (mode === 'no-pidev') throw new Error('simulated pi.dev outage')
     return new Response(JSON.stringify(PI_DEV), { status: 200 })
   }
-  if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+  if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
     if (mode === 'no-roster') throw new Error('simulated OCG outage')
     if (mode === 'stale') return new Response(JSON.stringify({ data: [{ id: 'stale-only' }] }), { status: 200 })
     return new Response(JSON.stringify(liveData), { status: 200 })
@@ -327,7 +327,7 @@ const ids = () => merged().map(m => m.id).sort()
       if (u.startsWith('https://pi.dev/')) {
         return new Response(JSON.stringify(catalog), { status: 200, headers: { etag: `"synthetic-${label}"` } })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -409,7 +409,7 @@ const ids = () => merged().map(m => m.id).sort()
     globalThis.fetch = async (url) => {
       const u = String(url)
       if (u.startsWith('https://pi.dev/')) throw new Error('simulated pi.dev outage')
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -445,7 +445,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
 {
   const m = merged().find(x => x.id === 'space-bunny')
   ok('Space Bunny descriptor 完整（协议/端点/容量/modalities）',
-    m?.api === 'openai-completions' && m?.baseUrl === 'https://opencode.ai/zen/go/v1'
+    m?.api === 'openai-completions' && m?.baseUrl === 'https://opencode.ai/inference/go/openai/v1'
       && m?.contextWindow === 1048576 && m?.maxTokens === 524288
       && m?.input?.includes('image') && m?.provider === 'opencode-go',
     JSON.stringify({ api: m?.api, ctx: m?.contextWindow, max: m?.maxTokens }))
@@ -455,6 +455,15 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
   ok('V4.1 Flash 带 deepseek compat（协议 quirks）',
     m?.compat?.thinkingFormat === 'deepseek' && m?.compat?.maxTokensField === 'max_tokens',
     JSON.stringify(m?.compat))
+}
+
+{
+  const upstream = PI_DEV.find(model => model.id === 'glm-5.3')
+  const glm = merged().find(model => model.id === 'glm-5.3')
+  ok('GLM-5.3 使用 Go Chat Completions 官方端点并保留 Pi 推理档位',
+    glm?.api === 'openai-completions' && glm?.baseUrl === 'https://opencode.ai/inference/go/openai/v1'
+      && glm?.reasoning === true && JSON.stringify(glm.thinkingLevelMap) === JSON.stringify(upstream?.thinkingLevelMap),
+    JSON.stringify(glm?.thinkingLevelMap))
 }
 
 // ── 2. 不丢官方客户端独有的模型 ──────────────────────────────────────────────
@@ -617,7 +626,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
       }
       return new Response(JSON.stringify(rows), { status: 200 })
     }
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: OCG_LIVE.map(m => ({ id: m.id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -675,7 +684,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
       if (reorder) rows.reverse()
       return new Response(JSON.stringify(rows), { status: 200 })
     }
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: OCG_LIVE.map(m => ({ id: m.id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -742,7 +751,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
       await gate                       // the network is the slow part
       return new Response(JSON.stringify(PI_DEV), { status: 200 })
     }
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -797,7 +806,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
       if (cond === ETAG) return new Response(null, { status: 304, headers: { etag: ETAG } })
       return new Response(JSON.stringify(PI_DEV), { status: 200, headers: { etag: ETAG } })
     }
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       rosterCond = init?.headers?.['if-none-match'] ?? null
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
@@ -858,7 +867,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
     const u = String(url)
     if (!online) throw new Error('simulated outage')
     if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(PI_DEV), { status: 200 })
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -930,7 +939,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
         seen.push(init?.headers?.['if-none-match'] ?? null)
         return new Response(JSON.stringify(PI_DEV), { status: 200, headers: { etag: CACHED_ETAG } })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -968,7 +977,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
         hits += 1
         return new Response(JSON.stringify(PI_DEV), { status: 200, headers: { etag: '"deferred-etag"' } })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -1034,7 +1043,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
         const rows = which === 0 ? first : second
         return new Response(JSON.stringify(rows), { status: 200, headers: { etag: `"etag-${which === 0 ? 'A' : 'B'}"` } })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -1141,7 +1150,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
     globalThis.fetch = async (url) => {
       const u = String(url)
       if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(PI_DEV), { status: 200 })
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         const ids = rosters[Math.min(call, rosters.length - 1)]
         call += 1
         return new Response(JSON.stringify({ data: ids.map(id => ({ id })) }), { status: 200 })
@@ -1298,7 +1307,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
   globalThis.fetch = async (url) => {
     const u = String(url)
     if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(HOSTILE), { status: 200 })
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -1316,10 +1325,10 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
   const got = coll.mergedModels()
   const completions = got.find(m => m.id === 'evil-completions')
   const anthropic = got.find(m => m.id === 'evil-anthropic')
-  ok('远端 baseUrl 被忽略：openai 类固定到 /v1', completions?.baseUrl === 'https://opencode.ai/zen/go/v1',
+  ok('远端 baseUrl 被忽略：openai 类固定到 /v1', completions?.baseUrl === 'https://opencode.ai/inference/go/openai/v1',
     completions?.baseUrl)
   ok('远端 baseUrl 被忽略：anthropic 固定到网关根（不拼 /v1）',
-    anthropic?.baseUrl === 'https://opencode.ai/zen/go', anthropic?.baseUrl)
+    anthropic?.baseUrl === 'https://opencode.ai/inference/go/anthropic', anthropic?.baseUrl)
   ok('远端 headers 被剥离', completions?.headers === undefined && anthropic?.headers === undefined,
     JSON.stringify({ c: completions?.headers, a: anthropic?.headers }))
   ok('未知协议的模型被丢弃（不存在的 transport 不注册）',
@@ -1362,7 +1371,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
   globalThis.fetch = async (url) => {
     const u = String(url)
     if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(MIXED), { status: 200 })
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -1393,7 +1402,7 @@ ok('Space Bunny 进入目录', ids().includes('space-bunny'))
   ok('控制面字段一个都没透传（url/endpoint/auth/proxy/apiKey/credentials/env/fetch/transport/headers）',
     leaked.length === 0, leaked.join(', ') || '无泄漏')
   ok('provider 仍被插件改写，baseUrl 仍被固定',
-    control?.provider === 'opencode-go' && control?.baseUrl === 'https://opencode.ai/zen/go/v1',
+    control?.provider === 'opencode-go' && control?.baseUrl === 'https://opencode.ai/inference/go/openai/v1',
     `${control?.provider} / ${control?.baseUrl}`)
   ok('未来能力字段原样透传，不被静默削掉',
     JSON.stringify(future?.output) === JSON.stringify(['text', 'image'])
@@ -1468,7 +1477,7 @@ await freshStateAsync()
 
       if (step.delay) await new Promise(r => setTimeout(r, step.delay))
       if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(step.catalog), { status: 200 })
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: step.roster.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -1607,7 +1616,7 @@ await freshStateAsync()
         call += 1
         return new Response(JSON.stringify(call === 1 ? PI_DEV : body), { status: 200 })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -1683,7 +1692,7 @@ await freshStateAsync()
       const u = String(url)
       const step = script[Math.min(poll, script.length - 1)]
       if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(step.catalog), { status: 200 })
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: step.roster.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -1853,7 +1862,7 @@ await freshStateAsync()
       const u = String(url)
       const catalog = poll === 0 ? PI_DEV : rows
       if (u.startsWith('https://pi.dev/')) { catalogPolls += 1; return new Response(JSON.stringify(catalog), { status: 200 }) }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: [...LIVE_IDS, 'hot-reload-new'].map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -1929,7 +1938,7 @@ await freshStateAsync()
     globalThis.fetch = async (url) => {
       const u = String(url)
       if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(PI_DEV), { status: 200 })
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         if (phase === 'old') {
           await gate
           return new Response(JSON.stringify({ data: COLLAPSE.map(id => ({ id })) }), { status: 200 })
@@ -1978,7 +1987,7 @@ await freshStateAsync()
     globalThis.fetch = async (url) => {
       const u = String(url)
       if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(PI_DEV), { status: 200 })
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -2045,7 +2054,7 @@ await freshStateAsync()
       if (u.startsWith('https://pi.dev/')) {
         return new Response(JSON.stringify(poll === 0 ? PI_DEV : stripped), { status: 200 })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -2096,7 +2105,7 @@ await freshStateAsync()
           init?.signal?.addEventListener('abort', die, { once: true })
         })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -2152,7 +2161,7 @@ await freshStateAsync()
         fetched.zenCatalog += 1
         return new Response(JSON.stringify(zenDirectory), { status: 200 })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         fetched.goRoster += 1
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
@@ -2221,7 +2230,7 @@ await freshStateAsync()
         counts.zen += 1
         return new Response(JSON.stringify(zenDirectory), { status: 200 })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       if (u.startsWith('https://opencode.ai/zen/v1/models')) {
@@ -2293,7 +2302,7 @@ await freshStateAsync()
     globalThis.fetch = async (url) => {
       const u = String(url)
       if (u.startsWith('https://pi.dev/')) { fetches += 1; return new Response(JSON.stringify(PI_DEV), { status: 200 }) }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       throw new Error(`unexpected fetch: ${u}`)
     }
     const coll = makeColl('opencode-go', () => INSTALLED.slice())
@@ -2346,7 +2355,7 @@ await freshStateAsync()
         if (hits === 1) await gate
         return new Response(JSON.stringify(PI_DEV), { status: 200 })
       }
-      if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+      if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
         return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${u}`)
@@ -2403,7 +2412,7 @@ await freshStateAsync()
   globalThis.fetch = async (url) => {
     const u = String(url)
     if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(PI_DEV), { status: 200 })
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -2505,7 +2514,7 @@ await freshStateAsync()
   globalThis.fetch = async (url) => {
     const u = String(url)
     if (u.startsWith('https://pi.dev/')) return new Response(JSON.stringify(PI_DEV), { status: 200 })
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify({ data: LIVE_IDS.map(id => ({ id })) }), { status: 200 })
     }
     throw new Error(`unexpected fetch: ${u}`)
@@ -2652,7 +2661,7 @@ await freshStateAsync()
     if (u.includes('/providers/opencode')) {
       return new Response(JSON.stringify(ZEN_DIRECTORY), { status: 200, headers: { etag: '"zen"' } })
     }
-    if (u.startsWith('https://opencode.ai/zen/go/v1/models')) {
+    if (u.startsWith('https://opencode.ai/inference/go/v1/models')) {
       return new Response(JSON.stringify(liveData), { status: 200 })
     }
     if (u.startsWith('https://opencode.ai/zen/v1/models')) {
@@ -2784,7 +2793,7 @@ await freshStateAsync()
     }
     if (u.includes('/providers/opencode-go')) return new Response(JSON.stringify(mode === 'updated' ? [...withLatest(PI_DEV, 'fixture-latest-go'), GO_GOOGLE] : PI_DEV))
     if (u.includes('/providers/opencode?')) return new Response(JSON.stringify(withLatest(ZEN_DIRECTORY, 'fixture-latest-zen')))
-    if (u === 'https://opencode.ai/zen/go/v1/models') return new Response(JSON.stringify(liveData))
+    if (u === 'https://opencode.ai/inference/go/v1/models') return new Response(JSON.stringify(liveData))
     if (u === 'https://opencode.ai/zen/v1/models') return new Response(JSON.stringify(fixture('zen-models.json')))
     throw new Error(`unexpected fetch: ${u}`)
   }
