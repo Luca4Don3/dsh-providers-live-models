@@ -8,6 +8,7 @@ const high = { provider: 'opencode-go', model: 'glm-5.3', reasoningEffort: 'high
 const max = { ...high, reasoningEffort: 'max' }
 const low = { ...high, reasoningEffort: 'low' }
 const other = { ...high, model: 'another' }
+const crossProvider = { provider: 'openai-codex', model: high.model }
 const ok = { ok: true, value: undefined }
 const fail = { ok: false, error: { code: 'unchanged', message: 'not accepted' } }
 
@@ -23,8 +24,9 @@ function fixture() {
       getSnapshot: () => this.state,
       update: fn => { const next = { ...this.state }; fn(next); this.state = next },
     }
-    state = { current: high, status: 'ready', pending: null,
-      groups: [{ id: high.provider, models: [{ id: high.model }, { id: other.model }] }] }
+    state = { current: high, status: 'ready', pending: null, routable: true,
+      groups: [{ id: high.provider, models: [{ id: high.model }, { id: other.model }] },
+        { id: crossProvider.provider, models: [{ id: crossProvider.model }] }] }
     async select(selection) {
       const version = ++this.generation
       this.state.pending = selection
@@ -88,11 +90,51 @@ test('a projection arriving during a catalog refresh updates the existing model 
   cleanup()
 })
 
-test('failed requests and model changes do not fake a confirmed effort', async () => {
+test('confirmed model changes render immediately, including the same ID at another provider', async () => {
   const { directory: d, cleanup } = fixture()
-  assert.equal(await settle(d, max, fail), fail)
-  assert.equal(d.state.current.reasoningEffort, 'high')
+  const pending = d.select(other)
+  assert.equal(d.state.current.model, high.model, 'no change before acknowledgement')
+  d.replies.shift()(ok)
+  await pending
+  assert.equal(d.state.current.model, other.model, 'no session navigation required')
+  d.selection = { next: other }
+  d.syncInputs()
+  d.state.status = 'loading'
+  await settle(d, crossProvider)
+  assert.equal(d.state.current.provider, crossProvider.provider)
+  assert.equal(d.state.current.reasoningEffort, undefined)
+  d.state.status = 'ready'
+  d.syncInputs()
+  assert.equal(d.state.current.provider, crossProvider.provider, 'catalog refresh does not undo acknowledgement')
+  assert.equal(d.state.routable, true)
+  cleanup()
+})
+
+test('returning to the original model before projection catch-up discards the previous acknowledgement', async () => {
+  const { directory: d, cleanup } = fixture()
   await settle(d, other)
+  assert.equal(d.state.current.model, other.model)
+  await settle(d, high)
+  assert.equal(d.state.current.model, high.model)
+  d.syncInputs()
+  assert.equal(d.state.current.model, high.model)
+  cleanup()
+})
+
+test('a successful selection can render before the first session projection', async () => {
+  const { directory: d, cleanup } = fixture()
+  d.selection = undefined
+  d.state.current = null
+  await settle(d, crossProvider)
+  assert.equal(d.state.current.provider, crossProvider.provider)
+  cleanup()
+})
+
+test('failed requests and unavailable models do not fake a confirmed selection', async () => {
+  const { directory: d, cleanup } = fixture()
+  assert.equal(await settle(d, other, fail), fail)
+  assert.equal(d.state.current.model, high.model)
+  await settle(d, { ...high, model: 'unlisted' })
   assert.equal(d.state.current.model, high.model)
   cleanup()
 })
